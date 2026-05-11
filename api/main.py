@@ -141,9 +141,31 @@ async def trading_bot_loop():
         # 10초마다 갱신
         await asyncio.sleep(10)
 
+from sqlalchemy import text
+from .database import SessionLocal
+
 @app.on_event("startup")
 async def startup_event():
     logger.info("Starting multi-tenant background trading loop...")
+    
+    # DB 마이그레이션: 기존 VARCHAR(50)로 생성된 컬럼을 암호화 데이터 길이에 맞게 확장
+    try:
+        db = SessionLocal()
+        engine_name = db.get_bind().dialect.name
+        if engine_name in ["mysql", "mariadb"]:
+            db.execute(text("ALTER TABLE api_credentials MODIFY api_key VARCHAR(512);"))
+            db.execute(text("ALTER TABLE api_credentials MODIFY secret_key VARCHAR(512);"))
+            db.execute(text("ALTER TABLE api_credentials MODIFY account_number VARCHAR(512);"))
+        elif engine_name == "postgresql":
+            db.execute(text("ALTER TABLE api_credentials ALTER COLUMN api_key TYPE VARCHAR(512);"))
+            db.execute(text("ALTER TABLE api_credentials ALTER COLUMN secret_key TYPE VARCHAR(512);"))
+            db.execute(text("ALTER TABLE api_credentials ALTER COLUMN account_number TYPE VARCHAR(512);"))
+        db.commit()
+    except Exception as e:
+        logger.warning(f"Migration skipped or already applied: {e}")
+    finally:
+        db.close()
+        
     asyncio.create_task(trading_bot_loop())
 
 @app.get("/")

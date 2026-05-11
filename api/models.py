@@ -21,9 +21,9 @@ class APICredential(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
     broker_name = Column(String(50)) # alpaca, kis, kiwoom
     env_type = Column(String(20)) # paper, live
-    api_key = Column(String(255))
-    secret_key = Column(String(255)) # 주의: 실제 상용에선 암호화(AES)되어야 함
-    account_number = Column(String(50), nullable=True)
+    api_key = Column(String(512))
+    secret_key = Column(String(512)) # 주의: 실제 상용에선 암호화(AES)되어야 함
+    account_number = Column(String(512), nullable=True)
 
     owner = relationship("User", back_populates="api_keys")
 
