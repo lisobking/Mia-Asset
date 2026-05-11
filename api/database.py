@@ -1,37 +1,43 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import declarative_base, sessionmaker
 import os
 
-# MariaDB 연결 URL (로컬 혹은 Docker 환경 변수 처리)
-# 환경 변수에 없으면 기본적으로 SQLite를 사용하여 테스트가 쉽게 만듭니다.
-DB_USER = os.getenv("DB_USER", "agbot")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "agbot_password")
-DB_HOST = os.getenv("DB_HOST", "127.0.0.1")
-DB_NAME = os.getenv("DB_NAME", "trading_db")
-
-# 로컬 개발 시에는 sqlite를 폴백으로 사용
 SQLALCHEMY_DATABASE_URL = os.getenv(
-    "DATABASE_URL", 
-    "sqlite:///./sql_app.db" # 기본값 SQLite
+    "DATABASE_URL",
+    "sqlite:///./sql_app.db"
 )
 
-# Render에서 제공하는 postgres:// 를 SQLAlchemy 1.4+ 지원 규격인 postgresql:// 로 자동 변환
+# Render postgres:// → postgresql:// 자동 변환
 if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
     SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
+is_sqlite = "sqlite" in SQLALCHEMY_DATABASE_URL
 
-# SQLite의 경우 check_same_thread=False 필요
-connect_args = {"check_same_thread": False} if "sqlite" in SQLALCHEMY_DATABASE_URL else {}
+# SQLite: check_same_thread=False + busy_timeout 10초 (잠금 대기 허용)
+connect_args = {"check_same_thread": False, "timeout": 10} if is_sqlite else {}
 
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args=connect_args
+    SQLALCHEMY_DATABASE_URL,
+    connect_args=connect_args,
+    # SQLite는 동시 접속이 제한적 → pool_size 최소화
+    **({} if not is_sqlite else {"pool_pre_ping": True})
 )
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+# SQLite WAL 모드 활성화:
+# - WAL(Write-Ahead Logging): 읽기/쓰기 동시 허용, 구 인스턴스와 신 인스턴스 공존 가능
+# - busy_timeout: 잠금 대기 시간을 5초로 제한 (무한 대기 방지)
+if is_sqlite:
+    @event.listens_for(engine, "connect")
+    def set_sqlite_pragma(dbapi_conn, connection_record):
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=5000")   # 5초 대기 후 포기
+        cursor.execute("PRAGMA synchronous=NORMAL")  # 성능 향상
+        cursor.close()
+
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# DB 세션 의존성 함수
 def get_db():
     db = SessionLocal()
     try:

@@ -181,31 +181,43 @@ from .database import SessionLocal
 
 @app.on_event("startup")
 async def startup_event():
-    logger.info("Starting multi-tenant background trading loop...")
-    
-    # DB 마이그레이션: get_bind()는 SQLAlchemy 2.0에서 제거됨 → engine.dialect.name 사용
-    try:
-        engine_name = engine.dialect.name
-        db = SessionLocal()
-        if engine_name in ["mysql", "mariadb"]:
-            db.execute(text("ALTER TABLE api_credentials MODIFY api_key VARCHAR(512);"))
-            db.execute(text("ALTER TABLE api_credentials MODIFY secret_key VARCHAR(512);"))
-            db.execute(text("ALTER TABLE api_credentials MODIFY account_number VARCHAR(512);"))
-        elif engine_name == "postgresql":
-            db.execute(text("ALTER TABLE api_credentials ALTER COLUMN api_key TYPE VARCHAR(512);"))
-            db.execute(text("ALTER TABLE api_credentials ALTER COLUMN secret_key TYPE VARCHAR(512);"))
-            db.execute(text("ALTER TABLE api_credentials ALTER COLUMN account_number TYPE VARCHAR(512);"))
-        db.commit()
-        logger.info(f"DB 마이그레이션 완료 (dialect: {engine_name})")
-    except Exception as e:
-        logger.warning(f"Migration skipped or already applied: {e}")
-    finally:
-        db.close()
+    """uvicorn 포트 바인딩을 막지 않도록 즉시 리턴.
+    DB 작업(migration) + 봇 루프 모두 daemon thread에서 실행."""
+    def _init_and_run():
+        # 10초 대기: Render 헬스체크가 포트를 확인할 시간 확보
+        import time as _time
+        _time.sleep(10)
 
-    logger.info("Starting bot daemon thread...")
-    bot_thread = threading.Thread(target=_bot_loop_thread, daemon=True, name="BotLoopThread")
-    bot_thread.start()
-    logger.info("Bot daemon thread started successfully.")
+        # DB 마이그레이션 (timeout 5초 내 실패 시 skip)
+        try:
+            from sqlalchemy import text
+            engine_name = engine.dialect.name
+            db = SessionLocal()
+            if engine_name in ["mysql", "mariadb"]:
+                db.execute(text("ALTER TABLE api_credentials MODIFY api_key VARCHAR(512);"))
+                db.execute(text("ALTER TABLE api_credentials MODIFY secret_key VARCHAR(512);"))
+                db.execute(text("ALTER TABLE api_credentials MODIFY account_number VARCHAR(512);"))
+            elif engine_name == "postgresql":
+                db.execute(text("ALTER TABLE api_credentials ALTER COLUMN api_key TYPE VARCHAR(512);"))
+                db.execute(text("ALTER TABLE api_credentials ALTER COLUMN secret_key TYPE VARCHAR(512);"))
+                db.execute(text("ALTER TABLE api_credentials ALTER COLUMN account_number TYPE VARCHAR(512);"))
+            db.commit()
+            logger.info(f"DB 마이그레이션 완료 (dialect: {engine_name})")
+        except Exception as e:
+            logger.warning(f"Migration skipped: {e}")
+        finally:
+            try: db.close()
+            except: pass
+
+        # 봇 루프 실행
+        logger.info("Bot loop thread started.")
+        _bot_loop_thread()
+
+    # 마이그레이션 + 봇 루프를 하나의 daemon thread에서 실행
+    t = threading.Thread(target=_init_and_run, daemon=True, name="InitAndBotThread")
+    t.start()
+    logger.info("✅ Startup event complete. Bot thread scheduled.")
+
 
 @app.get("/")
 @app.head("/")
