@@ -1,6 +1,8 @@
 import asyncio
 import os
 import logging
+import time
+import requests as req_lib
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, RedirectResponse
@@ -40,6 +42,25 @@ logging.basicConfig(level=logging.INFO)
 # 다중 사용자 대시보드 상태 DB (user_id를 키로 사용)
 user_bot_states = {}
 user_bots = {}
+
+# USD/KRW 환율 캐시 (1시간 갱신)
+_usd_krw_cache = {"rate": 1380.0, "fetched_at": 0.0}
+
+def get_usd_krw_rate() -> float:
+    """환율 API에서 USD→KRW 환율을 가져와 1시간 캐싱"""
+    if time.time() - _usd_krw_cache["fetched_at"] < 3600:
+        return _usd_krw_cache["rate"]
+    try:
+        res = req_lib.get("https://open.er-api.com/v6/latest/USD", timeout=3)
+        if res.status_code == 200:
+            rate = res.json()["rates"].get("KRW", 1380.0)
+            _usd_krw_cache["rate"] = rate
+            _usd_krw_cache["fetched_at"] = time.time()
+            logger.info(f"환율 갱신: 1 USD = {rate:.0f} KRW")
+            return rate
+    except Exception as e:
+        logger.warning(f"환율 조회 실패, 기본값 사용: {e}")
+    return _usd_krw_cache["rate"]
 
 async def trading_bot_loop():
     """주기적으로 각 사용자의 시세를 가져오고 매매 로직을 실행하는 백그라운드 태스크"""
@@ -221,6 +242,7 @@ def get_bot_status(current_user: User = Depends(get_current_user)):
         "is_active": False
     }).copy()
     state["email"] = current_user.email
+    state["usd_krw"] = get_usd_krw_rate()
     return state
 
 @app.get("/api/admin/users")

@@ -118,7 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── 주가 새로고침 관련 ────────────────────────────
     const refreshBtn = document.getElementById("btn-refresh-price");
     const lastUpdatedEl = document.getElementById("last-updated");
-    let countdown = 30;
+    let countdown = 15;
 
     // 상태 갱신 핵심 함수 (수동 + 자동 공용)
     async function fetchStatus() {
@@ -154,6 +154,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // 1. 가격 업데이트 및 변동 색상 효과
             const oldPrice = parseFloat(priceEl.innerText.replace(/,/g, '')) || 0;
             const newPrice = data.current_price || 0;
+            const usdKrw = data.usd_krw || 1380;
             if (!isNaN(newPrice) && newPrice > 0) {
                 priceEl.innerText = newPrice.toFixed(2);
                 if (newPrice > oldPrice && oldPrice > 0) {
@@ -162,6 +163,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     priceEl.style.color = '#ff3366';
                 }
                 setTimeout(() => { priceEl.style.color = 'inherit'; }, 800);
+
+                // 원화 환산 표시
+                const krwPrice = Math.round(newPrice * usdKrw);
+                const krwEl = document.getElementById('current-price-krw');
+                if (krwEl) krwEl.innerText = `≈ ₩${krwPrice.toLocaleString('ko-KR')}`;
             }
 
             // 2. 잔고 업데이트
@@ -231,7 +237,7 @@ document.addEventListener('DOMContentLoaded', () => {
             lastUpdatedEl.innerText = `${base} (${countdown}초 후 갱신)`;
         }
         if (countdown <= 0) {
-            countdown = 30;
+            countdown = 15;
             fetchStatus();
         }
     }, 1000);
