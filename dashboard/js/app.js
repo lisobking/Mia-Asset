@@ -157,17 +157,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (titleEl && data.symbol) titleEl.innerText = `지금 ${data.symbol} 주가는?`;
             }
 
-            // 2. 잔고 (달러 + 원화)
+            // 2. 잔고 — 원화 예수금 / 해외달러 각각 표시
             lastBalance = data.balance || 0;
+            lastUsdKrw = data.usd_krw || 1380;
+            const krwRaw = data.balance_krw || 0;
+            const usdRaw = data.balance_usd || data.balance || 0;
+
+            // 🇰🇷 원화 예수금
+            const krwDisplayEl = document.getElementById('balance-krw-display');
+            if (krwDisplayEl && !isHidden) {
+                krwDisplayEl.innerText = `₩${Math.round(krwRaw).toLocaleString('ko-KR')}`;
+            }
+            // 🇺🇸 해외달러 잔고 + 원화환산
             if (balanceEl && !isHidden) {
-                balanceEl.innerText = lastBalance.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+                balanceEl.innerText = usdRaw.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
             }
             if (balanceKrwEl && !isHidden) {
-                balanceKrwEl.innerText = `≈ ₩${Math.round(lastBalance * lastUsdKrw).toLocaleString('ko-KR')}`;
+                balanceKrwEl.innerText = usdRaw > 0 ? `≈ ₩${Math.round(usdRaw * lastUsdKrw).toLocaleString('ko-KR')}` : `≈ ₩0`;
             }
             const manualBalance = document.getElementById("manual-balance");
             const manualHeldQty = document.getElementById("manual-held-qty");
-            if (manualBalance) manualBalance.innerText = lastBalance.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+            if (manualBalance) manualBalance.innerText = usdRaw.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
             if (manualHeldQty) manualHeldQty.innerText = data.held_qty || 0;
 
             // 3. RSI — 0이면 로딩 표시, 값 있으면 바 표시

@@ -156,12 +156,21 @@ def _bot_loop_thread():
                     if current_price > 0 and is_active:
                         bot.process_data(current_price, current_rsi)
 
-                    # 4. 상태 및 잠고 업데이트
+                    # 4. 상태 및 잔고 업데이트
                     state_db["state"] = bot.state.value
-                    balance = broker.get_account_balance()
+                    # get_balance_detail() 지원 브로커(KIS)는 원화/달러 각각 저장
+                    if hasattr(broker, 'get_balance_detail'):
+                        bd = broker.get_balance_detail()
+                        state_db["balance_krw"] = bd.get("krw", 0.0)
+                        state_db["balance_usd"] = bd.get("usd", 0.0)
+                        usd_krw = _usd_krw_cache.get("rate", 1380.0)
+                        state_db["balance"] = bd["usd"] if bd["usd"] > 0 else round(bd["krw"] / usd_krw, 4)
+                    else:
+                        b = broker.get_account_balance()
+                        state_db["balance"] = b
+                        state_db["balance_krw"] = 0.0
+                        state_db["balance_usd"] = b
                     pos = broker.get_position(bot.symbol)
-
-                    state_db["balance"] = balance
                     state_db["held_qty"] = pos.get("qty", 0) if pos else 0
                     state_db["api_connected"] = True
 
@@ -273,6 +282,9 @@ def get_bot_status(current_user: User = Depends(get_current_user)):
     }).copy()
     state["email"] = current_user.email
     state["usd_krw"] = get_usd_krw_rate()
+    # balance_krw / balance_usd 다 단리지 않으면 기본값 보장
+    state.setdefault("balance_krw", 0.0)
+    state.setdefault("balance_usd", state.get("balance", 0.0))
     return state
 
 @app.get("/api/admin/users")

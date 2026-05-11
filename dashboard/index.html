@@ -48,12 +48,19 @@
                         <h2 style="margin-bottom: 0;">내 자산 현황</h2>
                         <button id="toggle-visibility" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size:1.2rem;">👁️</button>
                     </div>
-                    <!-- 달러 잔고 -->
-                    <div class="asset-amount">
-                        <span class="currency">$</span><span class="value" id="current-balance">--</span>
+                    <!-- 원화 잔고 -->
+                    <div style="margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+                        <div style="font-size:0.82rem; color:var(--text-secondary); margin-bottom:4px;">🇰🇷 원화 예수금</div>
+                        <div style="font-size:2rem; font-weight:800;" id="balance-krw-display">₩--</div>
                     </div>
-                    <!-- 원화 환산 잔고 -->
-                    <div id="balance-krw" style="font-size:1.1rem; color:var(--text-secondary); font-weight:600; margin-top:4px;">≈ ₩--</div>
+                    <!-- 해외주식 달러 잔고 -->
+                    <div style="margin-bottom: 14px;">
+                        <div style="font-size:0.82rem; color:var(--text-secondary); margin-bottom:4px;">🇺🇸 해외주식 달러 잔고</div>
+                        <div class="asset-amount">
+                            <span class="currency">$</span><span class="value" id="current-balance">--</span>
+                        </div>
+                        <div id="balance-krw" style="font-size:0.95rem; color:var(--text-secondary); font-weight:600; margin-top:2px;">≈ ₩--</div>
+                    </div>
 
                     <div class="asset-settings" style="margin-top: 18px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.05);">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">

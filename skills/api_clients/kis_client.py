@@ -182,39 +182,83 @@ class KisClient(BaseBroker):
             
         return {"qty": 0, "avg_entry_price": 0.0}
 
-    def get_account_balance(self) -> float:
-        """해외주식 체결기준 현재잔고 (외화 총 평가금액) 조회"""
-        url = f"{self.base_url}/uapi/overseas-stock/v1/trading/inquire-present-balance"
-        tr_id = "VTTS3012R" if self.is_paper else "CTTS3012R"
-        headers = self._get_base_headers(tr_id)
-        
+    def get_balance_detail(self) -> dict:
+        """원화 잔고와 해외주식 달러 잔고를 각각 조회하여 반환.
+        Returns: {"krw": float, "usd": float}
+        """
         cano = self.account_number[:8] if self.account_number and len(self.account_number) >= 8 else "00000000"
         acnt_prdt_cd = self.account_number.split("-")[-1] if self.account_number and "-" in self.account_number else "01"
-        
-        params = {
-            "CANO": cano,
-            "ACNT_PRDT_CD": acnt_prdt_cd,
-            "WCRC_FRCR_DVSN_CD": "01",
-            "NATN_CD": "840",
-            "TR_MKET_CD": "01",
-            "INQR_DVSN_CD": "00"
-        }
-        
+        krw_balance = 0.0
+        usd_balance = 0.0
+
+        # ---- 1. 원화 예수금 조회 (inquire-psbl-order) ----
         try:
+            tr_id = "VTTC8434R" if self.is_paper else "TTTC8434R"
+            url = f"{self.base_url}/uapi/domestic-stock/v1/trading/inquire-psbl-order"
+            headers = self._get_base_headers(tr_id)
+            params = {
+                "CANO": cano, "ACNT_PRDT_CD": acnt_prdt_cd,
+                "PDNO": "005930", "ORD_UNPR": "0", "ORD_DVSN": "01",
+                "CMA_EVLU_AMT_ICLD_YN": "Y", "OVRS_ICLD_YN": "Y"
+            }
             res = requests.get(url, headers=headers, params=params, timeout=5)
             if res.status_code == 200:
                 data = res.json()
+                logger.info(f"KIS 원화잡고 rt_cd={data.get('rt_cd')}, msg={data.get('msg1', '')}")
+                if data.get("rt_cd") == "0":
+                    output = data.get("output", {})
+                    if isinstance(output, list) and output:
+                        output = output[0]
+                    for field in ["ord_psbl_cash", "nrcvb_buy_amt", "dnca_tot_amt", "tot_evlu_amt"]:
+                        val = str(output.get(field, "")).strip()
+                        if val and val != "0":
+                            krw_balance = float(val)
+                            logger.info(f"KIS 원화 잡고({field}): ₩{krw_balance:,.0f}")
+                            break
+        except Exception as e:
+            logger.warning(f"KIS 원화 잡고 조회 실패: {e}")
+
+        # ---- 2. 해외주식 달러 잡고 조회 (inquire-present-balance) ----
+        try:
+            url = f"{self.base_url}/uapi/overseas-stock/v1/trading/inquire-present-balance"
+            tr_id = "VTTS3012R" if self.is_paper else "CTTS3012R"
+            headers = self._get_base_headers(tr_id)
+            params = {
+                "CANO": cano, "ACNT_PRDT_CD": acnt_prdt_cd,
+                "WCRC_FRCR_DVSN_CD": "01", "NATN_CD": "840",
+                "TR_MKET_CD": "01", "INQR_DVSN_CD": "00"
+            }
+            res = requests.get(url, headers=headers, params=params, timeout=5)
+            if res.status_code == 200:
+                data = res.json()
+                logger.info(f"KIS 해외잡고 rt_cd={data.get('rt_cd')}")
                 if data.get("rt_cd") == "0":
                     summary = data.get("output2", {})
-                    if isinstance(summary, list) and len(summary) > 0:
+                    if isinstance(summary, list) and summary:
                         summary = summary[0]
-                    # API 응답에 따라 총 평가금액 필드 매핑 (빈 문자열 안전 처리)
                     for field in ["tot_evlu_amt", "tot_asst_amt", "frcr_evlu_tota"]:
-                        val_str = str(summary.get(field, "")).strip()
-                        if val_str and val_str != "0":
-                            return float(val_str)
-                    return 0.0
+                        val = str(summary.get(field, "")).strip()
+                        if val and val != "0":
+                            usd_balance = float(val)
+                            logger.info(f"KIS 해외 잡고({field}): ${usd_balance}")
+                            break
         except Exception as e:
-            logger.error(f"KIS Balance Fetch Error: {e}")
-            
+            logger.warning(f"KIS 해외 잡고 조회 실패: {e}")
+
+        return {"krw": krw_balance, "usd": usd_balance}
+
+    def get_account_balance(self) -> float:
+        """하위호환 유지: 해외달러 잡고를 float으로 반환 (TradingStateMachine 호환 유지)"""
+        detail = self.get_balance_detail()
+        # 해외 달러 잔고가 있으면 우선, 없으면 원화를 환산
+        if detail["usd"] > 0:
+            return detail["usd"]
+        if detail["krw"] > 0:
+            try:
+                rate_res = requests.get("https://open.er-api.com/v6/latest/USD", timeout=3)
+                if rate_res.status_code == 200:
+                    usd_krw = rate_res.json()["rates"].get("KRW", 1380.0)
+                    return round(detail["krw"] / usd_krw, 4)
+            except Exception:
+                return round(detail["krw"] / 1380.0, 4)
         return 0.0
