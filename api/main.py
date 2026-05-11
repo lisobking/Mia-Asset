@@ -64,6 +64,8 @@ def get_usd_krw_rate() -> float:
 
 async def trading_bot_loop():
     """주기적으로 각 사용자의 시세를 가져오고 매매 로직을 실행하는 백그라운드 태스크"""
+    # uvicorn이 완전히 시작되고 Render 헬스체크에 응답할 시간을 확보
+    await asyncio.sleep(10)
     while True:
         try:
             db = next(get_db())
@@ -169,10 +171,10 @@ from .database import SessionLocal
 async def startup_event():
     logger.info("Starting multi-tenant background trading loop...")
     
-    # DB 마이그레이션: 기존 VARCHAR(50)로 생성된 컬럼을 암호화 데이터 길이에 맞게 확장
+    # DB 마이그레이션: get_bind()는 SQLAlchemy 2.0에서 제거됨 → engine.dialect.name 사용
     try:
+        engine_name = engine.dialect.name
         db = SessionLocal()
-        engine_name = db.get_bind().dialect.name
         if engine_name in ["mysql", "mariadb"]:
             db.execute(text("ALTER TABLE api_credentials MODIFY api_key VARCHAR(512);"))
             db.execute(text("ALTER TABLE api_credentials MODIFY secret_key VARCHAR(512);"))
@@ -182,11 +184,13 @@ async def startup_event():
             db.execute(text("ALTER TABLE api_credentials ALTER COLUMN secret_key TYPE VARCHAR(512);"))
             db.execute(text("ALTER TABLE api_credentials ALTER COLUMN account_number TYPE VARCHAR(512);"))
         db.commit()
+        logger.info(f"DB 마이그레이션 완료 (dialect: {engine_name})")
     except Exception as e:
         logger.warning(f"Migration skipped or already applied: {e}")
     finally:
         db.close()
-        
+
+    logger.info("Application startup complete - scheduling bot loop...")
     asyncio.create_task(trading_bot_loop())
 
 @app.get("/")
