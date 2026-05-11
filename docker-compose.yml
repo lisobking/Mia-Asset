@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  # 백엔드 서버 (FastAPI)
+  ag-bot-web:
+    build: .
+    container_name: ag-bot-web-server
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    environment:
+      - ALPACA_API_KEY=${ALPACA_API_KEY}
+      - ALPACA_SECRET_KEY=${ALPACA_SECRET_KEY}
+      - DB_HOST=ag-mariadb
+      - DB_USER=agbot
+      - DB_PASSWORD=agbot_password
+      - DB_NAME=trading_db
+    restart: unless-stopped
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      - ag-mariadb
+
+  # 매매 기록 저장을 위한 MariaDB (초보자 맞춤형 RDBMS)
+  ag-mariadb:
+    image: mariadb:10.11
+    container_name: ag-mariadb-server
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: trading_db
+      MYSQL_USER: agbot
+      MYSQL_PASSWORD: agbot_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+
+volumes:
+  mariadb_data:

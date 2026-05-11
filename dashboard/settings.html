@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>증권사 계좌 연동 - 똑똑한 AI 매매봇</title>
+    <!-- 친근하고 가독성 높은 폰트 (Pretendard 기반) -->
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css" />
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        .settings-card { max-width: 500px; margin: 0 auto; padding: 40px;}
+        .form-group { margin-bottom: 24px; }
+        .form-group label { display: block; margin-bottom: 10px; font-weight: 700; color: var(--text-primary); font-size: 1.05rem;}
+        .form-control { width: 100%; padding: 16px 20px; border-radius: 14px; border: 1px solid #e5e8eb; font-size: 1.05rem; background: #f9fafb; transition: all 0.2s ease; font-family: 'Pretendard', sans-serif;}
+        .form-control:focus { outline: none; border-color: var(--accent-blue); background: #fff; box-shadow: 0 0 0 4px rgba(49, 130, 246, 0.1); }
+        .toggle-group { display: flex; gap: 12px; }
+        .toggle-btn { flex: 1; padding: 16px; border-radius: 14px; border: 1px solid #e5e8eb; background: #fff; color: var(--text-secondary); font-weight: 700; cursor: pointer; transition: all 0.2s ease; font-size: 1rem;}
+        .toggle-btn.active { border-color: var(--accent-blue); color: var(--accent-blue); background: rgba(49, 130, 246, 0.05); }
+        .btn-save { width: 100%; padding: 18px; border-radius: 16px; border: none; background: var(--accent-blue); color: #fff; font-size: 1.2rem; font-weight: 800; cursor: pointer; transition: background 0.2s; margin-top: 10px;}
+        .btn-save:hover { background: var(--accent-blue-hover); }
+        .security-notice { background: rgba(255, 170, 0, 0.1); color: #e69500; padding: 18px; border-radius: 14px; font-size: 0.95rem; font-weight: 600; margin-bottom: 30px; line-height: 1.5; text-align: left;}
+        .back-link { text-decoration: none; color: var(--text-secondary); font-weight: 600; font-size: 1.1rem; transition: color 0.2s;}
+        .back-link:hover { color: var(--accent-blue); }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- 상단 헤더 -->
+        <header class="app-header">
+            <div class="logo-area">
+                <h1>증권사 계좌 연동</h1>
+            </div>
+            <a href="/" class="back-link">← 대시보드로 돌아가기</a>
+        </header>
+
+        <!-- 설정 메인 화면 -->
+        <main class="dashboard-layout" style="display:block;">
+            <div class="card settings-card">
+                
+                <div class="security-notice">
+                    🔒 <strong>안심하세요!</strong><br>
+                    입력하신 증권사 정보는 어떠한 외부 서버로도 유출되지 않으며, 고객님의 컴퓨터 환경(.env) 내부에만 안전하게 저장됩니다.
+                </div>
+
+                <form id="api-settings-form">
+                    <div class="form-group">
+                        <label for="broker-select">연동할 증권사 선택</label>
+                        <select id="broker-select" class="form-control">
+                            <option value="kis" selected>한국투자증권 (국내/해외 주식)</option>
+                            <option value="alpaca">알파카 (Alpaca - 미국 주식 전용)</option>
+                            <option value="kiwoom">키움증권 (준비중)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>투자 환경</label>
+                        <div class="toggle-group">
+                            <button type="button" class="toggle-btn active" id="env-paper">가상 투자 (모의투자)</button>
+                            <button type="button" class="toggle-btn" id="env-live">실전 투자 (내 돈으로)</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="api-key">API Key (앱 키)</label>
+                        <input type="text" id="api-key" class="form-control" placeholder="발급받은 API 키를 입력해주세요" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="secret-key">Secret Key (앱 비밀키)</label>
+                        <input type="password" id="secret-key" class="form-control" placeholder="발급받은 Secret 키를 입력해주세요" required>
+                    </div>
+
+                    <!-- 한국투자증권 전용 계좌번호 필드 -->
+                    <div class="form-group" id="account-group" style="display: block;">
+                        <label for="account-number">계좌번호 (한국투자증권 전용)</label>
+                        <input type="text" id="account-number" class="form-control" placeholder="예: 12345678-01">
+                    </div>
+
+                    <button type="submit" class="btn-save">연동 정보 저장하기</button>
+                </form>
+            </div>
+
+            <!-- 종목 선택 패널 -->
+            <div class="card settings-card" style="margin-top: 20px;">
+                <div class="security-notice" style="background: rgba(49, 130, 246, 0.1); color: var(--accent-blue);">
+                    📈 <strong>어떤 주식을 매매할까요?</strong><br>
+                    봇이 24시간 감시하고 자동으로 사고 팔 주식 종목을 선택해주세요.
+                </div>
+
+                <form id="ticker-settings-form">
+                    <div class="form-group">
+                        <label for="target-ticker">주식 종목 심볼 (예: AAPL, TSLA, SOXL)</label>
+                        <input type="text" id="target-ticker" class="form-control" placeholder="종목 코드를 영문으로 입력하세요" style="text-transform: uppercase;" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="trade-amount">1회 매수 금액 ($)</label>
+                        <input type="number" id="trade-amount" class="form-control" placeholder="예: 1000" min="10" required>
+                    </div>
+
+                    <button type="submit" class="btn-save">종목 설정 저장하기</button>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // 로그인 검증 스크립트
+        const token = localStorage.getItem("agbot_token");
+        if (!token) {
+            window.location.href = "login.html";
+        }
+        // 토글 버튼 스크립트
+        document.getElementById('env-paper').addEventListener('click', function() {
+            this.classList.add('active');
+            document.getElementById('env-live').classList.remove('active');
+        });
+
+        document.getElementById('env-live').addEventListener('click', function() {
+            this.classList.add('active');
+            document.getElementById('env-paper').classList.remove('active');
+        });
+
+        // 한국투자증권 선택 시 계좌번호 필드 노출
+        document.getElementById('broker-select').addEventListener('change', function() {
+            if (this.value === 'kis') {
+                document.getElementById('account-group').style.display = 'block';
+            } else {
+                document.getElementById('account-group').style.display = 'none';
+            }
+        });
+
+        // 폼 제출 (저장) 스크립트
+        document.getElementById('api-settings-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const btn = document.querySelector('.btn-save');
+            const originalText = btn.innerText;
+            btn.innerText = "저장 중입니다...";
+            
+            const env_type = document.getElementById('env-paper').classList.contains('active') ? 'paper' : 'live';
+            const data = {
+                broker: document.getElementById('broker-select').value,
+                env_type: env_type,
+                api_key: document.getElementById('api-key').value,
+                secret_key: document.getElementById('secret-key').value,
+                account_number: document.getElementById('account-number').value
+            };
+
+            try {
+                // 백엔드 API 호출
+                const response = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    btn.innerText = "성공적으로 연동되었습니다!";
+                    btn.style.background = "#00be64"; // 성공 초록색 (토스 스타일)
+                } else {
+                    btn.innerText = "오류가 발생했습니다.";
+                    btn.style.background = "var(--positive-red)"; // 실패 빨간색
+                }
+            } catch (err) {
+                btn.innerText = "네트워크 연결 오류";
+                btn.style.background = "var(--positive-red)";
+            }
+            
+            // 2초 뒤 버튼 원상복구
+            setTimeout(() => {
+                btn.innerText = originalText;
+                btn.style.background = "var(--accent-blue)";
+            }, 2000);
+        });
+
+        // 종목 설정 폼 제출 스크립트
+        document.getElementById('ticker-settings-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const btn = e.target.querySelector('.btn-save');
+            const originalText = btn.innerText;
+            btn.innerText = "저장 중...";
+            
+            const data = {
+                target_symbol: document.getElementById('target-ticker').value.toUpperCase(),
+                trade_amount: parseFloat(document.getElementById('trade-amount').value)
+            };
+
+            try {
+                // 백엔드 API 호출 (인증 토큰 포함)
+                const response = await fetch('/api/trading-settings', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                if (response.ok) {
+                    btn.innerText = "종목이 설정되었습니다!";
+                    btn.style.background = "#00be64";
+                } else {
+                    btn.innerText = "설정 실패";
+                    btn.style.background = "var(--positive-red)";
+                }
+            } catch (err) {
+                btn.innerText = "네트워크 오류";
+                btn.style.background = "var(--positive-red)";
+            }
+            
+            setTimeout(() => {
+                btn.innerText = originalText;
+                btn.style.background = "var(--accent-blue)";
+            }, 2000);
+        });
+    </script>
+</body>
+</html>

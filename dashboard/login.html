@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>로그인 - 똑똑한 AI 매매봇</title>
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css" />
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        body { display: flex; align-items: center; justify-content: center; min-height: 100vh; background-color: var(--bg-color); }
+        .auth-card { width: 100%; max-width: 400px; padding: 40px; }
+        .auth-header { text-align: center; margin-bottom: 40px; }
+        .auth-header h1 { font-size: 1.8rem; font-weight: 800; color: var(--text-primary); margin-bottom: 10px; }
+        .auth-header p { color: var(--text-secondary); font-size: 1rem; }
+        .form-group { margin-bottom: 20px; }
+        .form-control { width: 100%; padding: 16px 20px; border-radius: 14px; border: 1px solid #e5e8eb; font-size: 1.05rem; font-family: 'Pretendard', sans-serif; transition: all 0.2s ease; background: #f9fafb; }
+        .form-control:focus { outline: none; border-color: var(--accent-blue); background: #fff; box-shadow: 0 0 0 4px rgba(49, 130, 246, 0.1); }
+        .btn-auth { width: 100%; padding: 18px; border-radius: 16px; border: none; background: var(--accent-blue); color: #fff; font-size: 1.1rem; font-weight: 700; cursor: pointer; transition: background 0.2s; margin-top: 10px; }
+        .btn-auth:hover { background: var(--accent-blue-hover); }
+        .auth-footer { text-align: center; margin-top: 24px; color: var(--text-secondary); font-size: 0.95rem; }
+        .auth-footer a { color: var(--accent-blue); text-decoration: none; font-weight: 600; }
+        .auth-footer a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="card auth-card">
+        <div class="auth-header">
+            <img src="img/bank_teller.png" alt="은행원 캐릭터" style="width: 120px; height: 120px; object-fit: cover; border-radius: 50%; margin-bottom: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+            <h1>환영합니다!</h1>
+            <p>나만의 주식 자동매매 비서를 만나보세요</p>
+        </div>
+        <form id="login-form">
+            <div class="form-group">
+                <input type="email" id="email" class="form-control" placeholder="이메일 주소" required>
+            </div>
+            <div class="form-group">
+                <input type="password" id="password" class="form-control" placeholder="비밀번호" required>
+            </div>
+            <button type="submit" class="btn-auth">로그인</button>
+        </form>
+        <div class="auth-footer">
+            아직 계정이 없으신가요? <a href="signup.html">회원가입 하기</a>
+        </div>
+    </div>
+    <script>
+        // 입력 실수 시 클릭하면 초기화
+        document.querySelectorAll('.form-control').forEach(input => {
+            input.addEventListener('click', function() {
+                this.value = '';
+            });
+        });
+
+        document.getElementById('login-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const btn = document.querySelector('.btn-auth');
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            const originalText = btn.innerText;
+            btn.innerText = "로그인 중...";
+            btn.disabled = true;
+            
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: email, password: password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // JWT 토큰을 localStorage에 저장
+                    localStorage.setItem("agbot_token", data.access_token);
+                    window.location.href = "index.html"; // 대시보드로 이동
+                } else {
+                    alert("로그인 실패: " + (data.detail || "이메일 또는 비밀번호를 확인해주세요."));
+                    btn.innerText = originalText;
+                    btn.disabled = false;
+                }
+            } catch (err) {
+                alert("서버와 통신할 수 없습니다.");
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

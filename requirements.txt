@@ -1,0 +1,14 @@
+pandas
+numpy
+alpaca-trade-api
+python-dotenv
+pytest
+pymysql
+sqlalchemy
+pyjwt
+passlib[bcrypt]
+python-multipart
+requests
+fastapi
+uvicorn
+pydantic

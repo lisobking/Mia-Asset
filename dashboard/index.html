@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>쉬운 자동매매 봇</title>
+    <!-- 친근하고 가독성 높은 폰트 (Pretendard 기반) -->
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css" />
+    <link rel="stylesheet" href="css/styles.css">
+    <!-- 로그인 검증 스크립트 (가장 먼저 실행) -->
+    <script>
+        const token = localStorage.getItem("agbot_token");
+        if (!token) {
+            window.location.href = "login.html";
+        }
+        
+        function logout() {
+            localStorage.removeItem("agbot_token");
+            window.location.href = "login.html";
+        }
+    </script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- 상단 헤더 -->
+        <header class="app-header">
+            <div class="logo-area">
+                <h1>똑똑한 AI 매매봇</h1>
+                <span class="status-pill online">● 정상 작동중</span>
+            </div>
+            <div class="header-actions">
+                <a href="settings.html" style="margin-right:15px; text-decoration:none; color:var(--text-secondary); font-weight:600;">⚙️ 설정</a>
+                <button onclick="logout()" style="background:none; border:none; color:var(--negative-blue); font-weight:600; cursor:pointer; font-size:1rem;">로그아웃</button>
+            </div>
+        </header>
+
+        <!-- 메인 대시보드 -->
+        <main class="dashboard-layout">
+            
+            <!-- 왼쪽: 내 자산과 봇 상태 -->
+            <section class="left-column">
+                <div class="card my-asset-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                        <h2 style="margin-bottom: 0;">내 자산 현황</h2>
+                        <button id="toggle-visibility" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size:1.2rem;">👁️</button>
+                    </div>
+                    <div class="asset-amount">
+                        <span class="currency">$</span><span class="value" id="current-balance">102,450.00</span>
+                    </div>
+                    
+                    <div class="asset-settings" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.05);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span style="color: var(--text-secondary); font-size: 0.9rem;">자동매매 기준금액</span>
+                            <span style="color: var(--text-primary); font-weight: 700;" id="base-amount-display">$50,000</span>
+                        </div>
+                        <input type="range" id="base-amount-slider" min="1000" max="200000" step="1000" value="50000" style="width: 100%; accent-color: var(--accent-blue);">
+                    </div>
+
+                    <div class="profit positive" style="margin-top: 15px;">
+                        <span>오늘 수익률: <strong>+2.45%</strong></span>
+                    </div>
+                </div>
+
+                <div class="card bot-status-card">
+                    <h2>AI 봇 상태</h2>
+                    <div class="status-display">
+                        <!-- IDLE: 대기중, HOLDING: 주식 보유중 -->
+                        <div class="current-state badge-holding" id="bot-state-badge">주식 보유중 📈</div>
+                        <p class="state-desc" id="bot-state-desc">현재 수익을 지켜보며 매도 타이밍을 찾고 있어요.</p>
+                    </div>
+                    
+                    <div class="action-buttons">
+                        <button class="btn btn-primary">▶ 자동매매 시작</button>
+                        <button class="btn btn-danger">■ 일시 정지</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 오른쪽: 시장 상황 -->
+            <section class="right-column">
+                <div class="card market-card">
+                    <h2>지금 SOXL 주가는?</h2>
+                    <div class="price-display">
+                        <span class="currency">$</span><span class="value" id="current-price">34.50</span>
+                    </div>
+                    
+                    <div class="market-temperature">
+                        <h3>시장 온도 (RSI 지수)</h3>
+                        <p class="temp-desc">숫자가 30 이하면 '차가움(매수 기회)', 70 이상이면 '뜨거움(매도 기회)' 이에요.</p>
+                        
+                        <div class="temp-bar-container">
+                            <div class="temp-bar">
+                                <div class="temp-fill" id="rsi-fill" style="width: 45%;"></div>
+                            </div>
+                            <div class="temp-markers">
+                                <span>차가움(30)</span>
+                                <span>현재 <strong id="rsi-val">45.0</strong></span>
+                                <span>뜨거움(70)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 수동 주문 (초보자를 위한 심플한 버튼) -->
+                <div class="card manual-order-card">
+                    <h2>내가 직접 주문하기</h2>
+                    <p>AI 봇의 판단을 기다리지 않고 지금 당장 사고 팔 수 있어요.</p>
+                    <div class="order-buttons">
+                        <button class="btn btn-buy">지금 사기 (Buy)</button>
+                        <button class="btn btn-sell">지금 팔기 (Sell)</button>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- 하단 매매현황 영역 -->
+            <section class="bottom-section" style="grid-column: 1 / -1;">
+                <div class="dashboard-layout" style="margin-top:0;">
+                    <div class="card history-card">
+                        <h2>금일 매매 현황</h2>
+                        <ul class="trade-list">
+                            <li><span class="time">14:30</span> <span class="action sell">매도</span> <span class="detail">SOXL 10주 @ $34.50</span></li>
+                            <li><span class="time">09:15</span> <span class="action buy">매수</span> <span class="detail">SOXL 10주 @ $33.20</span></li>
+                        </ul>
+                    </div>
+                    <div class="card history-card">
+                        <h2>전일 매매 현황</h2>
+                        <ul class="trade-list">
+                            <li><span class="time">15:50</span> <span class="action sell">매도</span> <span class="detail">SOXL 5주 @ $35.10</span></li>
+                            <li><span class="time">10:20</span> <span class="action buy">매수</span> <span class="detail">SOXL 5주 @ $32.80</span></li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,148 @@
+/* =========================================
+   Anti-Gravity - Beginner Friendly UI
+========================================= */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+    --bg-color: #0a0b10;
+    --card-bg: rgba(22, 25, 37, 0.65);
+    --text-primary: #f0f0f5;
+    --text-secondary: #8b92a5;
+    --accent-blue: #00f0ff;
+    --accent-blue-hover: #00c3d0;
+    --positive-red: #ff3366; 
+    --positive-red-bg: rgba(255, 51, 102, 0.1);
+    --negative-blue: #3182f6; 
+    --negative-blue-bg: rgba(49, 130, 246, 0.1);
+    --warning: #ffcc00;
+}
+
+body {
+    font-family: 'Pretendard', -apple-system, sans-serif;
+    background-color: var(--bg-color);
+    background-image: radial-gradient(circle at 50% 0%, rgba(0, 240, 255, 0.05) 0%, transparent 50%);
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+    padding: 20px;
+    min-height: 100vh;
+}
+
+.app-container {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+/* Header */
+.app-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 2rem;
+    padding: 1rem 0;
+}
+.logo-area h1 { font-size: 1.8rem; font-weight: 800; color: var(--text-primary); margin-bottom: 8px;}
+.status-pill {
+    display: inline-block; padding: 6px 12px; border-radius: 20px;
+    font-size: 0.85rem; font-weight: 600;
+}
+.status-pill.online { background: rgba(0, 190, 100, 0.1); color: #00be64; }
+
+/* Layout */
+.dashboard-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+/* Cards */
+.card {
+    background: var(--card-bg);
+    border-radius: 24px;
+    padding: 30px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    margin-bottom: 20px;
+    transition: all 0.3s ease;
+}
+.card:hover { 
+    transform: translateY(-2px); 
+    box-shadow: 0 8px 32px rgba(0, 240, 255, 0.1);
+    border-color: rgba(0, 240, 255, 0.2);
+}
+
+.card h2 { font-size: 1.2rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 1.5rem; }
+
+/* Asset Display */
+.asset-amount { font-size: 2.5rem; font-weight: 800; margin-bottom: 10px; }
+.currency { font-size: 1.5rem; color: var(--text-secondary); margin-right: 4px; }
+.profit { font-size: 1.1rem; font-weight: 600; }
+.profit.positive { color: var(--positive-red); }
+
+/* Bot Status */
+.status-display { margin-bottom: 2rem; }
+.current-state { display: inline-block; padding: 12px 24px; border-radius: 16px; font-size: 1.4rem; font-weight: 700; margin-bottom: 10px; }
+.badge-holding { background: var(--positive-red-bg); color: var(--positive-red); }
+.badge-idle { background: #f2f4f6; color: var(--text-secondary); }
+.state-desc { color: var(--text-secondary); line-height: 1.5; font-size: 0.95rem; }
+
+/* Market Info */
+.price-display { font-size: 3rem; font-weight: 800; margin-bottom: 2rem; color: var(--accent-blue); }
+.market-temperature h3 { font-size: 1rem; color: var(--text-primary); margin-bottom: 5px; }
+.temp-desc { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem; }
+.temp-bar-container { width: 100%; margin-top: 20px; }
+.temp-bar { width: 100%; height: 12px; background: #e5e8eb; border-radius: 6px; overflow: hidden; }
+.temp-fill { height: 100%; background: linear-gradient(90deg, var(--negative-blue), var(--positive-red)); border-radius: 6px; transition: width 0.3s ease; }
+.temp-markers { display: flex; justify-content: space-between; margin-top: 8px; font-size: 0.8rem; color: var(--text-secondary); font-weight: 600;}
+
+/* Buttons */
+.action-buttons, .order-buttons { display: flex; gap: 10px; }
+.btn { flex: 1; padding: 16px; border-radius: 16px; border: none; font-size: 1rem; font-weight: 700; cursor: pointer; transition: all 0.2s; font-family: 'Pretendard', sans-serif;}
+.btn-primary { 
+    background: transparent; 
+    border: 1px solid var(--accent-blue); 
+    color: var(--accent-blue); 
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.1);
+}
+.btn-primary:hover { 
+    background: var(--accent-blue); 
+    color: #000; 
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
+}
+.btn-danger { background: rgba(255,255,255,0.05); color: var(--text-primary); border: 1px solid rgba(255,255,255,0.1); }
+.btn-danger:hover { background: rgba(255,255,255,0.1); }
+
+.btn-buy { background: var(--positive-red-bg); color: var(--positive-red); }
+.btn-sell { background: var(--negative-blue-bg); color: var(--negative-blue); }
+.btn-buy:hover { background: rgba(240, 68, 82, 0.15); }
+.btn-sell:hover { background: rgba(49, 130, 246, 0.15); }
+
+/* Responsive */
+@media (max-width: 768px) {
+    .dashboard-layout { grid-template-columns: 1fr; }
+    .card { padding: 20px; border-radius: 20px; }
+}
+
+/* Forms & Inputs */
+.form-control {
+    width: 100%; padding: 16px 20px; border-radius: 14px; 
+    border: 1px solid rgba(255,255,255,0.1); 
+    font-size: 1.05rem; font-family: 'Pretendard', sans-serif; 
+    transition: all 0.2s ease; 
+    background: rgba(0,0,0,0.3);
+    color: var(--text-primary);
+}
+.form-control:focus {
+    outline: none; 
+    border-color: var(--accent-blue); 
+    background: rgba(0,0,0,0.5); 
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+}
+.trade-list { list-style: none; padding: 0; }
+.trade-list li { display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.trade-list li:last-child { border-bottom: none; }
+.trade-list .time { color: var(--text-secondary); font-size: 0.9rem; margin-right: 15px; width: 45px; }
+.trade-list .action { padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; font-weight: 700; margin-right: 15px; }
+.trade-list .action.buy { background: var(--positive-red-bg); color: var(--positive-red); }
+.trade-list .action.sell { background: var(--negative-blue-bg); color: var(--negative-blue); }
+.trade-list .detail { color: var(--text-primary); font-weight: 500; }
