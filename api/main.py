@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 from .database import engine, Base, get_db
 from .models import User, APICredential, TradingSetting
-from .auth import get_password_hash, verify_password, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES, SECRET_KEY, ALGORITHM
+from .auth import get_password_hash, verify_password, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES, SECRET_KEY, ALGORITHM, encrypt_data, decrypt_data
 from datetime import timedelta
 import jwt
 from fastapi.security import OAuth2PasswordBearer
@@ -73,12 +73,16 @@ async def trading_bot_loop():
                         continue
                         
                     if user.id not in user_bots:
+                        decrypted_api_key = decrypt_data(cred.api_key)
+                        decrypted_secret_key = decrypt_data(cred.secret_key)
+                        decrypted_account = decrypt_data(cred.account_number) if cred.account_number else None
+                        
                         is_paper = (cred.env_type == "paper")
                         if cred.broker_name == "kis":
                             from skills.api_clients.kis_client import KisClient
-                            broker = KisClient(is_paper=is_paper, api_key=cred.api_key, secret_key=cred.secret_key, account_number=cred.account_number)
+                            broker = KisClient(is_paper=is_paper, api_key=decrypted_api_key, secret_key=decrypted_secret_key, account_number=decrypted_account)
                         else:
-                            broker = AlpacaClient(is_paper=is_paper, api_key=cred.api_key, secret_key=cred.secret_key)
+                            broker = AlpacaClient(is_paper=is_paper, api_key=decrypted_api_key, secret_key=decrypted_secret_key)
                         
                         bot = TradingStateMachine(broker=broker, symbol=state_db["symbol"])
                         user_bots[user.id] = {"broker": broker, "bot": bot}
@@ -250,9 +254,9 @@ def save_settings(settings: APISettings, current_user: User = Depends(get_curren
             
         db_cred.broker_name = settings.broker
         db_cred.env_type = settings.env_type
-        db_cred.api_key = settings.api_key
-        db_cred.secret_key = settings.secret_key
-        db_cred.account_number = settings.account_number
+        db_cred.api_key = encrypt_data(settings.api_key)
+        db_cred.secret_key = encrypt_data(settings.secret_key)
+        db_cred.account_number = encrypt_data(settings.account_number) if settings.account_number else None
         db.commit()
         
         return {"status": "success", "message": "API credentials saved to DB"}
