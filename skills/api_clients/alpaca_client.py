@@ -16,10 +16,14 @@ class AlpacaClient(BaseBroker):
             self.api = None
         
     def get_current_price(self, symbol: str) -> float:
-        """종목의 가장 최근 가격(호가) 반환"""
+        """종목의 가장 최근 체결가 반환"""
         if not self.api: return 0.0
-        quote = self.api.get_latest_quote(symbol)
-        return float(quote.ap)
+        try:
+            trade = self.api.get_latest_trade(symbol)
+            return float(trade.price)
+        except Exception as e:
+            print(f"Alpaca price fetch error: {e}")
+            return 0.0
         
     def submit_order(self, symbol: str, qty: int, side: str, order_type: str = "market") -> dict:
         """시장가 주문 제출"""

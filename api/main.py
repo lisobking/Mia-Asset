@@ -291,6 +291,10 @@ def save_settings(settings: APISettings, current_user: User = Depends(get_curren
         db_cred.account_number = encrypt_data(settings.account_number) if settings.account_number else None
         db.commit()
         
+        # 새로운 API 키가 반영될 수 있도록 메모리에 캐싱된 봇 인스턴스 초기화
+        if current_user.id in user_bots:
+            del user_bots[current_user.id]
+        
         return {"status": "success", "message": "API credentials saved to DB"}
     except Exception as e:
         logger.error(f"Error saving settings: {e}")
