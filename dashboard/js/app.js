@@ -115,16 +115,26 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnBuy) btnBuy.addEventListener("click", () => manualTrade("buy"));
     if (btnSell) btnSell.addEventListener("click", () => manualTrade("sell"));
 
-    // 2초마다 백엔드 API에서 봇 상태를 가져와 대시보드 업데이트
-    setInterval(async () => {
+    // ── 주가 새로고침 관련 ────────────────────────────
+    const refreshBtn = document.getElementById("btn-refresh-price");
+    const lastUpdatedEl = document.getElementById("last-updated");
+    let countdown = 30;
+
+    // 상태 갱신 핵심 함수 (수동 + 자동 공용)
+    async function fetchStatus() {
+        const token = localStorage.getItem("agbot_token");
+        if (!token) return;
+
+        if (refreshBtn) {
+            refreshBtn.innerHTML = '⏳ <span style="font-size:0.8rem;">불러오는 중...</span>';
+            refreshBtn.disabled = true;
+        }
+
         try {
-            const token = localStorage.getItem("agbot_token");
-            if (!token) return; // 로그인 안됨
-            
             const response = await fetch('/api/status', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            
+
             if (!response.ok) {
                 if (response.status === 401) {
                     localStorage.removeItem("agbot_token");
@@ -132,73 +142,100 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 return;
             }
-            
+
             const data = await response.json();
-            
+
             // 관리자 버튼 표시
             if (data.email === "lisob@naver.com") {
-                const adminBtn = document.getElementById("admin-btn");
-                if (adminBtn) adminBtn.style.display = "inline-block";
+                const ab = document.getElementById("admin-btn");
+                if (ab) ab.style.display = "inline-block";
             }
-            
-            // 1. 가격 업데이트 및 변동 효과
-            const oldPrice = parseFloat(priceEl.innerText) || 0;
+
+            // 1. 가격 업데이트 및 변동 색상 효과
+            const oldPrice = parseFloat(priceEl.innerText.replace(/,/g, '')) || 0;
             const newPrice = data.current_price || 0;
-            if (!isNaN(newPrice)) {
+            if (!isNaN(newPrice) && newPrice > 0) {
                 priceEl.innerText = newPrice.toFixed(2);
-                
-                if(newPrice > oldPrice && oldPrice > 0) {
+                if (newPrice > oldPrice && oldPrice > 0) {
                     priceEl.style.color = '#00ff88';
                 } else if (newPrice < oldPrice && oldPrice > 0) {
                     priceEl.style.color = '#ff3366';
                 }
-                setTimeout(() => { priceEl.style.color = 'inherit'; }, 500);
+                setTimeout(() => { priceEl.style.color = 'inherit'; }, 800);
             }
 
-            // 잔고 업데이트 (숨김 모드가 아닐 때만)
-            if (balanceEl && data.balance !== undefined) {
-                if (!isHidden) {
-                    balanceEl.innerText = data.balance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                }
+            // 2. 잔고 업데이트
+            if (balanceEl && data.balance !== undefined && !isHidden) {
+                balanceEl.innerText = data.balance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
             }
-
             const manualBalance = document.getElementById("manual-balance");
             const manualHeldQty = document.getElementById("manual-held-qty");
             if (manualBalance) manualBalance.innerText = data.balance ? data.balance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : "0.00";
             if (manualHeldQty) manualHeldQty.innerText = data.held_qty || 0;
 
-            // 2. RSI 업데이트
+            // 3. RSI 업데이트
             if (rsiVal && rsiFill) {
                 const rsi = data.rsi_15m || 0;
                 rsiVal.innerText = rsi.toFixed(1);
                 rsiFill.style.width = `${Math.min(Math.max(rsi, 0), 100)}%`;
             }
-            
-            // 3. 상태(State) 뱃지 업데이트
+
+            // 4. 봇 상태 뱃지 업데이트
             if (stateBadge && data.state) {
                 if (data.is_active === false) {
-                    stateBadge.className = "current-state";
                     stateBadge.innerText = "일시 정지됨 ⏸️";
                     stateBadge.style.color = "#ffcc00";
-                    stateBadge.style.background = "rgba(255, 204, 0, 0.1)";
+                    stateBadge.style.background = "rgba(255,204,0,0.1)";
                     if (stateDesc) stateDesc.innerText = "자동매매가 중지되었습니다. 수동매매만 가능합니다.";
                 } else if (data.state === "IDLE") {
-                    stateBadge.className = "current-state";
                     stateBadge.innerText = "대기중 ☕";
                     stateBadge.style.color = "#8b92a5";
                     stateBadge.style.background = "rgba(255,255,255,0.05)";
                     if (stateDesc) stateDesc.innerText = "현재 좋은 매수 타이밍을 기다리고 있습니다.";
                 } else if (data.state === "HOLDING") {
-                    stateBadge.className = "current-state badge-holding";
                     stateBadge.innerText = "주식 보유중 📈";
                     stateBadge.style.color = "#00ff88";
-                    stateBadge.style.background = "rgba(0, 255, 136, 0.1)";
+                    stateBadge.style.background = "rgba(0,255,136,0.1)";
                     if (stateDesc) stateDesc.innerText = "현재 수익을 지켜보며 매도 타이밍을 찾고 있어요.";
                 }
             }
 
-        } catch (error) {
-            console.error("API 연동 에러:", error);
+            // 5. 마지막 업데이트 시각 표시
+            const now = new Date();
+            if (lastUpdatedEl) {
+                lastUpdatedEl.innerText = `마지막 갱신: ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+            }
+            countdown = 30;
+
+        } catch (err) {
+            console.error("API 연동 에러:", err);
+        } finally {
+            if (refreshBtn) {
+                refreshBtn.innerHTML = '🔄 <span style="font-size:0.8rem;">새로고침</span>';
+                refreshBtn.disabled = false;
+            }
         }
-    }, 2000);
+    }
+
+    // 새로고침 버튼 클릭 시 즉시 호출
+    if (refreshBtn) refreshBtn.addEventListener("click", () => {
+        countdown = 30;
+        fetchStatus();
+    });
+
+    // 30초 자동 갱신 타이머
+    setInterval(() => {
+        countdown--;
+        if (lastUpdatedEl && countdown > 0) {
+            const base = lastUpdatedEl.innerText.split(" (")[0];
+            lastUpdatedEl.innerText = `${base} (${countdown}초 후 갱신)`;
+        }
+        if (countdown <= 0) {
+            countdown = 30;
+            fetchStatus();
+        }
+    }, 1000);
+
+    // 페이지 로드 시 즉시 1회 실행
+    fetchStatus();
 });
