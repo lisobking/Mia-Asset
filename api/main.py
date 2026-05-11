@@ -134,6 +134,7 @@ async def startup_event():
     asyncio.create_task(trading_bot_loop())
 
 @app.get("/")
+@app.head("/")
 def read_root():
     return FileResponse("dashboard/index.html")
 
