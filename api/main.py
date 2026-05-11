@@ -2,6 +2,7 @@ import asyncio
 import os
 import logging
 import time
+import threading
 import requests as req_lib
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.staticfiles import StaticFiles
@@ -62,20 +63,28 @@ def get_usd_krw_rate() -> float:
         logger.warning(f"환율 조회 실패, 기본값 사용: {e}")
     return _usd_krw_cache["rate"]
 
-async def trading_bot_loop():
-    """주기적으로 각 사용자의 시세를 가져오고 매매 로직을 실행하는 백그라운드 태스크"""
-    # uvicorn이 완전히 시작되고 Render 헬스체크에 응답할 시간을 확보
-    await asyncio.sleep(10)
+def _bot_loop_thread():
+    """븇 루프를 별도 daemon 스레드에서 실행
+    
+    asyncio task 대신 thread를 사용하는 이유:
+    - requests 라이브러리의 동기 HTTP 호출이 asyncio 이벤트 루프를 블로킹함
+    - 블로킹 중 Render 헬스체크 HTTP 요청이 응답을 못 받아 타임아웃 발생
+    - thread는 이벤트 루프와 완전히 분리되어 FastAPI가 항상 응답 가능
+    """
+    # 서버 완전 시작 후 보트 루프 시작 (Render 헬스체크 시간 확보)
+    time.sleep(10)
+    logger.info("Bot loop thread started.")
+
     while True:
         try:
             db = next(get_db())
             users = db.query(User).all()
-            
+
             for user in users:
                 try:
                     cred = db.query(APICredential).filter(APICredential.user_id == user.id).first()
                     setting = db.query(TradingSetting).filter(TradingSetting.user_id == user.id).first()
-                    
+
                     if user.id not in user_bot_states:
                         symbol = setting.target_symbol if setting else "SOXL"
                         user_bot_states[user.id] = {
@@ -89,70 +98,73 @@ async def trading_bot_loop():
                             "api_connected": False,
                             "is_active": False
                         }
-                    
+
                     state_db = user_bot_states[user.id]
-                    
+
                     if not cred or not cred.api_key:
                         state_db["api_connected"] = False
                         continue
-                        
+
                     if user.id not in user_bots:
                         decrypted_api_key = decrypt_data(cred.api_key)
                         decrypted_secret_key = decrypt_data(cred.secret_key)
                         decrypted_account = decrypt_data(cred.account_number) if cred.account_number else None
-                        
+
                         is_paper = (cred.env_type == "paper")
                         if cred.broker_name == "kis":
                             from skills.api_clients.kis_client import KisClient
                             broker = KisClient(is_paper=is_paper, api_key=decrypted_api_key, secret_key=decrypted_secret_key, account_number=decrypted_account)
                         else:
                             broker = AlpacaClient(is_paper=is_paper, api_key=decrypted_api_key, secret_key=decrypted_secret_key)
-                        
+
                         trade_amount = setting.trade_amount if setting else 50000.0
                         bot = TradingStateMachine(broker=broker, symbol=state_db["symbol"], trade_amount=trade_amount)
                         user_bots[user.id] = {"broker": broker, "bot": bot}
-                    
+
                     user_bot = user_bots[user.id]
                     broker = user_bot["broker"]
                     bot = user_bot["bot"]
-                    
+
                     # 종목 변경 체크
                     if setting and bot.symbol != setting.target_symbol:
                         bot.symbol = setting.target_symbol
                         state_db["symbol"] = setting.target_symbol
-                    
+
                     # 1. 시세 조회
                     current_price = broker.get_current_price(bot.symbol)
                     state_db["current_price"] = current_price
-                    
-                    # 2. 15분봉 데이터 조회 및 RSI 계산
+
+                    # 2. 15분봉 RSI 계산 (알파카인 경우만)
                     try:
-                        bars = broker.api.get_bars(bot.symbol, "15Min", limit=30).df
-                        if not bars.empty:
-                            rsi_df = calculate_rsi(bars, period=14, price_col="close")
-                            current_rsi = float(rsi_df['rsi'].iloc[-1])
-                            state_db["rsi_15m"] = current_rsi
+                        if hasattr(broker, 'api') and broker.api:
+                            bars = broker.api.get_bars(bot.symbol, "15Min", limit=30).df
+                            if not bars.empty:
+                                rsi_df = calculate_rsi(bars, period=14, price_col="close")
+                                current_rsi = float(rsi_df['rsi'].iloc[-1])
+                                state_db["rsi_15m"] = current_rsi
+                            else:
+                                current_rsi = state_db["rsi_15m"]
                         else:
-                            current_rsi = 50.0
-                    except Exception as e:
+                            current_rsi = state_db["rsi_15m"]
+                    except Exception:
                         current_rsi = state_db["rsi_15m"]
 
                     # 3. 메인 트레이딩 로직 실행
                     is_active = setting.is_active if setting else False
                     state_db["is_active"] = is_active
-                    
+
                     if current_price > 0 and is_active:
                         bot.process_data(current_price, current_rsi)
-                    
-                    # 4. 상태 및 잔고 업데이트
+
+                    # 4. 상태 및 잠고 업데이트
                     state_db["state"] = bot.state.value
                     balance = broker.get_account_balance()
                     pos = broker.get_position(bot.symbol)
-                    
+
                     state_db["balance"] = balance
                     state_db["held_qty"] = pos.get("qty", 0) if pos else 0
                     state_db["api_connected"] = True
-                    
+
                 except Exception as user_e:
                     logger.error(f"Error processing bot for user {user.id}: {user_e}")
                     if user.id in user_bot_states:
@@ -160,9 +172,9 @@ async def trading_bot_loop():
 
         except Exception as e:
             logger.error(f"Bot loop main error: {e}")
-            
-        # 10초마다 갱신
-        await asyncio.sleep(10)
+
+        # 15초마다 갱신
+        time.sleep(15)
 
 from sqlalchemy import text
 from .database import SessionLocal
@@ -190,8 +202,10 @@ async def startup_event():
     finally:
         db.close()
 
-    logger.info("Application startup complete - scheduling bot loop...")
-    asyncio.create_task(trading_bot_loop())
+    logger.info("Starting bot daemon thread...")
+    bot_thread = threading.Thread(target=_bot_loop_thread, daemon=True, name="BotLoopThread")
+    bot_thread.start()
+    logger.info("Bot daemon thread started successfully.")
 
 @app.get("/")
 @app.head("/")
