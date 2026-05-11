@@ -20,4 +20,4 @@ COPY . .
 EXPOSE 8000
 
 # 컨테이너 실행 시 FastAPI 서버 구동 (Render의 $PORT 환경 변수 대응)
-CMD sh -c "uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}"
+CMD uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}
