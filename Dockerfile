@@ -16,8 +16,8 @@ RUN pip install --no-cache-dir fastapi uvicorn
 # 소스 코드 전체 복사
 COPY . .
 
-# 외부로 노출할 포트
-EXPOSE 8000
+# Render Free 티어 기본 포트 10000
+EXPOSE 10000
 
-# 컨테이너 실행 시 FastAPI 서버 구동 (Render의 $PORT 환경 변수 대응)
-CMD ["python", "run.py"]
+# shell form 사용: $PORT 환경변수가 런타임에 치환됨 (exec form은 치환 불가)
+CMD ["sh", "-c", "python run.py"]
