@@ -19,5 +19,5 @@ COPY . .
 # 외부로 노출할 포트
 EXPOSE 8000
 
-# 컨테이너 실행 시 FastAPI 서버 구동
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# 컨테이너 실행 시 FastAPI 서버 구동 (Render의 $PORT 환경 변수 대응)
+CMD sh -c "uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}"
