@@ -7,6 +7,29 @@ document.addEventListener('DOMContentLoaded', () => {
     const stateBadge = document.getElementById('bot-state-badge');
     const stateDesc = document.getElementById('bot-state-desc');
     
+    // 자산 가리기/보기 토글 기능
+    const toggleBtn = document.getElementById('toggle-visibility');
+    let isHidden = false;
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', () => {
+            isHidden = !isHidden;
+            toggleBtn.innerText = isHidden ? '🙈' : '👁️';
+            if (isHidden && balanceEl) {
+                balanceEl.innerText = '****';
+            }
+        });
+    }
+
+    // 자동매매 기준금액 슬라이더 기능
+    const slider = document.getElementById('base-amount-slider');
+    const sliderDisplay = document.getElementById('base-amount-display');
+    if (slider && sliderDisplay) {
+        slider.addEventListener('input', (e) => {
+            sliderDisplay.innerText = '$' + parseInt(e.target.value).toLocaleString('en-US');
+            // TODO: 슬라이더 값을 백엔드(api/trading-settings)로 저장하는 API 호출 추가 가능
+        });
+    }
+
     // 2초마다 백엔드 API에서 봇 상태를 가져와 대시보드 업데이트
     setInterval(async () => {
         try {
@@ -30,18 +53,22 @@ document.addEventListener('DOMContentLoaded', () => {
             // 1. 가격 업데이트 및 변동 효과
             const oldPrice = parseFloat(priceEl.innerText) || 0;
             const newPrice = data.current_price || 0;
-            priceEl.innerText = newPrice.toFixed(2);
-            
-            if(newPrice > oldPrice && oldPrice > 0) {
-                priceEl.style.color = '#00ff88';
-            } else if (newPrice < oldPrice && oldPrice > 0) {
-                priceEl.style.color = '#ff3366';
+            if (!isNaN(newPrice)) {
+                priceEl.innerText = newPrice.toFixed(2);
+                
+                if(newPrice > oldPrice && oldPrice > 0) {
+                    priceEl.style.color = '#00ff88';
+                } else if (newPrice < oldPrice && oldPrice > 0) {
+                    priceEl.style.color = '#ff3366';
+                }
+                setTimeout(() => { priceEl.style.color = 'inherit'; }, 500);
             }
-            setTimeout(() => { priceEl.style.color = 'inherit'; }, 500);
 
-            // 잔고 업데이트
+            // 잔고 업데이트 (숨김 모드가 아닐 때만)
             if (balanceEl && data.balance !== undefined) {
-                balanceEl.innerText = data.balance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                if (!isHidden) {
+                    balanceEl.innerText = data.balance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                }
             }
 
             // 2. RSI 업데이트
