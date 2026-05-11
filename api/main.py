@@ -29,6 +29,7 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(title="Anti-Gravity Trading Bot API")
 
 # 프론트엔드 정적 파일 서빙 (CSS/JS 404 방지)
+app.mount("/img", StaticFiles(directory="dashboard/img"), name="img")
 app.mount("/css", StaticFiles(directory="dashboard/css"), name="css")
 app.mount("/js", StaticFiles(directory="dashboard/js"), name="js")
 app.mount("/dashboard", StaticFiles(directory="dashboard"), name="dashboard")
