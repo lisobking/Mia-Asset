@@ -138,6 +138,13 @@ body {
     background: rgba(0,0,0,0.5); 
     box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
 }
+
+input[type="password"].form-control {
+    font-family: Verdana, "Malgun Gothic", sans-serif !important;
+    letter-spacing: 3px !important;
+    font-size: 1.2rem !important;
+}
+
 .trade-list { list-style: none; padding: 0; }
 .trade-list li { display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
 .trade-list li:last-child { border-bottom: none; }
