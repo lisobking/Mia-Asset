@@ -71,12 +71,12 @@ class KisClient(BaseBroker):
         }
 
     def get_current_price(self, symbol: str) -> float:
-        """해외주식(미국) 현재체결가 조회"""
+        """해외주식(미국) 현재체결가 조회 (장 마감 시 빈 문자열 안전 처리)"""
         url = f"{self.base_url}/uapi/overseas-price/v1/quotations/price"
         headers = self._get_base_headers("HHDFS00000300")
         params = {
             "AUTH": "",
-            "EXCD": "NAS", # 나스닥 기준 (뉴욕은 AMX, NBN 등 조정 필요)
+            "EXCD": "NAS",  # 나스닥 기준 (NYSE: AMS, AMEX: AMX)
             "SYMB": symbol
         }
         try:
@@ -84,10 +84,20 @@ class KisClient(BaseBroker):
             if res.status_code == 200:
                 data = res.json()
                 if data.get("rt_cd") == "0":
-                    return float(data["output"]["last"])
+                    output = data.get("output", {})
+                    # 장 마감/데이터 없을 때 KIS는 숫자 필드를 빈 문자열('')로 반환함
+                    last_str = output.get("last", "").strip()
+                    if not last_str:
+                        # last가 없으면 전일 종가(base)로 대체 시도
+                        last_str = output.get("base", "").strip()
+                    if last_str:
+                        return float(last_str)
+                    logger.warning(f"KIS: {symbol} 가격 데이터 없음 (장 마감 또는 미지원 종목)")
+                else:
+                    logger.warning(f"KIS Price API 오류: rt_cd={data.get('rt_cd')}, msg={data.get('msg1')}")
         except Exception as e:
             logger.error(f"KIS Price Fetch Error for {symbol}: {e}")
-            
+        
         return 0.0
         
     def submit_order(self, symbol: str, qty: int, side: str, order_type: str = "market") -> dict:
@@ -152,8 +162,10 @@ class KisClient(BaseBroker):
                     holdings = data.get("output1", [])
                     for item in holdings:
                         if item.get("ovrs_pdno") == symbol:
-                            qty = int(float(item.get("ovrs_cblc_qty", 0)))
-                            avg_price = float(item.get("pchs_avg_pric", 0))
+                            qty_str = item.get("ovrs_cblc_qty", "").strip()
+                            avg_str = item.get("pchs_avg_pric", "").strip()
+                            qty = int(float(qty_str)) if qty_str else 0
+                            avg_price = float(avg_str) if avg_str else 0.0
                             return {"qty": qty, "avg_entry_price": avg_price}
         except Exception as e:
             logger.error(f"KIS Position Fetch Error for {symbol}: {e}")
@@ -186,8 +198,12 @@ class KisClient(BaseBroker):
                     summary = data.get("output2", {})
                     if isinstance(summary, list) and len(summary) > 0:
                         summary = summary[0]
-                    # API 응답에 따라 총 평가금액 필드 매핑, 실패시 기본값 10000 달러 리턴
-                    return float(summary.get("tot_evlu_amt", 0) or summary.get("tot_asst_amt", 10000.0))
+                    # API 응답에 따라 총 평가금액 필드 매핑 (빈 문자열 안전 처리)
+                    for field in ["tot_evlu_amt", "tot_asst_amt", "frcr_evlu_tota"]:
+                        val_str = str(summary.get(field, "")).strip()
+                        if val_str and val_str != "0":
+                            return float(val_str)
+                    return 0.0
         except Exception as e:
             logger.error(f"KIS Balance Fetch Error: {e}")
             
