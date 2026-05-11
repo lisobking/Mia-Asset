@@ -117,7 +117,7 @@ def _bot_loop_thread():
                         else:
                             broker = AlpacaClient(is_paper=is_paper, api_key=decrypted_api_key, secret_key=decrypted_secret_key)
 
-                        trade_amount = setting.trade_amount if setting else 50000.0
+                        trade_amount = setting.trade_amount if setting else 500.0  # 기본값 $500
                         bot = TradingStateMachine(broker=broker, symbol=state_db["symbol"], trade_amount=trade_amount)
                         user_bots[user.id] = {"broker": broker, "bot": bot}
 
@@ -339,6 +339,40 @@ def save_settings(settings: APISettings, current_user: User = Depends(get_curren
     except Exception as e:
         logger.error(f"Error saving settings: {e}")
         return {"status": "error", "message": str(e)}
+
+@app.get("/api/settings")
+def get_api_settings(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """현재 저장된 자격증명 조회 (API 키는 마스킹 처리)"""
+    cred = db.query(APICredential).filter(APICredential.user_id == current_user.id).first()
+    setting = db.query(TradingSetting).filter(TradingSetting.user_id == current_user.id).first()
+    if not cred or not cred.api_key:
+        return {
+            "has_credentials": False,
+            "target_symbol": setting.target_symbol if setting else "SOXL",
+            "trade_amount": setting.trade_amount if setting else 500.0
+        }
+    # 암호화된 raw 값의 앞 6자 마스킹 표시 (복호화하지 않고 존재 여부만 노출)
+    return {
+        "has_credentials": True,
+        "broker_name": cred.broker_name,
+        "env_type": cred.env_type,
+        "masked_api_key": "••••••••" + (decrypt_data(cred.api_key) or "")[-4:],
+        "target_symbol": setting.target_symbol if setting else "SOXL",
+        "trade_amount": setting.trade_amount if setting else 500.0
+    }
+
+@app.delete("/api/settings")
+def delete_api_settings(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """저장된 자격증명 삭제 (메모리 캐시 포함)"""
+    cred = db.query(APICredential).filter(APICredential.user_id == current_user.id).first()
+    if cred:
+        db.delete(cred)
+        db.commit()
+    # 메모리 캐시도 즉시 초기화
+    user_bots.pop(current_user.id, None)
+    user_bot_states.pop(current_user.id, None)
+    logger.info(f"User {current_user.id} credentials deleted.")
+    return {"status": "success", "message": "연동 정보가 삭제되었습니다."}
 
 class TradingSettingsUpdate(BaseModel):
     target_symbol: str

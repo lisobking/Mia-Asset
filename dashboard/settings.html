@@ -10,7 +10,7 @@
     <style>
         .settings-card { max-width: 500px; margin: 0 auto; padding: 40px;}
         .form-group { margin-bottom: 24px; }
-        .form-group label { display: block; margin-bottom: 10px; font-weight: 700; color: var(--text-primary); font-size: 1.05rem;}
+        .form-group label { display: block; margin-bottom: 10px; font-weight: 700; color: #111; font-size: 1.05rem;}
         .form-control { width: 100%; padding: 16px 20px; border-radius: 14px; border: 1px solid #e5e8eb; font-size: 1.05rem; background: #f9fafb; transition: all 0.2s ease; font-family: 'Pretendard', sans-serif; color: #111; }
         .form-control::placeholder { color: #999; }
         .form-control:focus { outline: none; border-color: var(--accent-blue); background: #fff; box-shadow: 0 0 0 4px rgba(49, 130, 246, 0.1); }
@@ -22,6 +22,22 @@
         .security-notice { background: rgba(255, 170, 0, 0.1); color: #e69500; padding: 18px; border-radius: 14px; font-size: 0.95rem; font-weight: 600; margin-bottom: 30px; line-height: 1.5; text-align: left;}
         .back-link { text-decoration: none; color: var(--text-secondary); font-weight: 600; font-size: 1.1rem; transition: color 0.2s;}
         .back-link:hover { color: var(--accent-blue); }
+        /* 연동 현황 박스 */
+        .cred-status-box { border-radius: 16px; padding: 20px 24px; margin-bottom: 24px; border: 1px solid rgba(0, 190, 100, 0.3); background: rgba(0, 190, 100, 0.07); }
+        .cred-status-box h4 { font-size: 1rem; color: #00be64; margin-bottom: 10px; }
+        .cred-status-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 6px; }
+        .cred-status-row strong { color: var(--text-primary); font-weight: 600; }
+        .btn-delete-cred { width: 100%; margin-top: 14px; padding: 12px; border-radius: 12px; border: 1px solid rgba(255,51,102,0.4); background: transparent; color: #ff3366; font-size: 0.95rem; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+        .btn-delete-cred:hover { background: rgba(255,51,102,0.1); }
+        /* 삭제 확인 모달 */
+        .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:1000; align-items:center; justify-content:center; backdrop-filter:blur(4px); }
+        .modal-overlay.show { display:flex; }
+        .modal-box { background:#161925; border:1px solid rgba(255,255,255,0.1); border-radius:24px; padding:40px; max-width:360px; width:90%; text-align:center; }
+        .modal-box h3 { font-size:1.3rem; color: var(--text-primary); margin-bottom:12px; }
+        .modal-box p { color:var(--text-secondary); margin-bottom:28px; line-height:1.6; font-size: 0.95rem; }
+        .modal-actions { display:flex; gap:12px; }
+        .modal-btn-cancel { flex:1; padding:14px; border-radius:12px; border:1px solid rgba(255,255,255,0.15); background:transparent; color:var(--text-primary); font-size:1rem; font-weight:700; cursor:pointer; }
+        .modal-btn-delete { flex:1; padding:14px; border-radius:12px; border:none; background:#ff3366; color:#fff; font-size:1rem; font-weight:700; cursor:pointer; }
     </style>
 </head>
 <body>
@@ -38,9 +54,27 @@
         <main class="dashboard-layout" style="display:block;">
             <div class="card settings-card">
                 
+                <!-- 연동 현황 박스 (저장된 키가 있을 때만 표시) -->
+                <div id="cred-status-box" class="cred-status-box" style="display:none;">
+                    <h4>✅ 현재 연동 중</h4>
+                    <div class="cred-status-row">
+                        <span>증권사</span>
+                        <strong id="cred-broker-name">-</strong>
+                    </div>
+                    <div class="cred-status-row">
+                        <span>투자 환경</span>
+                        <strong id="cred-env-type">-</strong>
+                    </div>
+                    <div class="cred-status-row">
+                        <span>API Key</span>
+                        <strong id="cred-masked-key" style="font-family: monospace; letter-spacing: 1px;">-</strong>
+                    </div>
+                    <button class="btn-delete-cred" id="btn-delete-cred">🗑️ 연동 삭제하기</button>
+                </div>
+
                 <div class="security-notice">
                     🔒 <strong>안심하세요!</strong><br>
-                    입력하신 증권사 정보는 어떠한 외부 서버로도 유출되지 않으며, 고객님의 컴퓨터 환경(.env) 내부에만 안전하게 저장됩니다.
+                    입력하신 증권사 정보는 암호화되어 서버에 안전하게 저장됩니다.
                 </div>
 
                 <form id="api-settings-form">
@@ -96,7 +130,7 @@
 
                     <div class="form-group">
                         <label for="trade-amount">1회 매수 금액 ($)</label>
-                        <input type="number" id="trade-amount" class="form-control" placeholder="예: 1000" min="10" required>
+                        <input type="number" id="trade-amount" class="form-control" placeholder="예: 500" min="10" max="500" value="500" required>
                     </div>
 
                     <button type="submit" class="btn-save">종목 설정 저장하기</button>
@@ -105,12 +139,94 @@
         </main>
     </div>
 
+    <!-- 삭제 확인 모달 -->
+    <div class="modal-overlay" id="delete-modal">
+        <div class="modal-box">
+            <h3>🗑️ 연동 삭제</h3>
+            <p>정말로 연동 정보를 삭제하시겠습니까?<br>삭제하면 자동매매가 즉시 중지되며<br>다시 연동하려면 API 키를 재입력해야 합니다.</p>
+            <div class="modal-actions">
+                <button class="modal-btn-cancel" id="modal-cancel">취소</button>
+                <button class="modal-btn-delete" id="modal-confirm">삭제하기</button>
+            </div>
+        </div>
+    </div>
+
     <script>
-        // 로그인 검증 스크립트
         const token = localStorage.getItem("agbot_token");
-        if (!token) {
-            window.location.href = "login.html";
+        if (!token) { window.location.href = "login.html"; }
+
+        // 페이지 로드 시 기존 설정 자동 조회
+        async function loadCurrentSettings() {
+            try {
+                const res = await fetch('/api/settings', { headers: { 'Authorization': `Bearer ${token}` } });
+                if (!res.ok) return;
+                const data = await res.json();
+
+                // 연동 현황 박스
+                const statusBox = document.getElementById('cred-status-box');
+                if (data.has_credentials && statusBox) {
+                    statusBox.style.display = 'block';
+                    const brokerNames = { kis: '한국투자증권', alpaca: '알파카 (Alpaca)' };
+                    document.getElementById('cred-broker-name').innerText = brokerNames[data.broker_name] || data.broker_name;
+                    document.getElementById('cred-env-type').innerText = data.env_type === 'paper' ? '🧪 모의투자' : '💰 실전투자';
+                    document.getElementById('cred-masked-key').innerText = data.masked_api_key;
+                    // 브로커 셀렉트 선택 반영
+                    if (data.broker_name) document.getElementById('broker-select').value = data.broker_name;
+                    if (data.broker_name === 'kis') document.getElementById('account-group').style.display = 'block';
+                    else document.getElementById('account-group').style.display = 'none';
+                    // 투자 환경 토글 반영
+                    if (data.env_type === 'paper') {
+                        document.getElementById('env-paper').classList.add('active');
+                        document.getElementById('env-live').classList.remove('active');
+                    } else {
+                        document.getElementById('env-live').classList.add('active');
+                        document.getElementById('env-paper').classList.remove('active');
+                    }
+                }
+
+                // 종목·매수금액 자동 채우기
+                if (data.target_symbol) document.getElementById('target-ticker').value = data.target_symbol;
+                if (data.trade_amount) document.getElementById('trade-amount').value = Math.min(data.trade_amount, 500);
+
+            } catch(e) { console.error('설정 조회 실패:', e); }
         }
+        loadCurrentSettings();
+
+        // 연동 삭제 버튼
+        const deleteBtn = document.getElementById('btn-delete-cred');
+        const deleteModal = document.getElementById('delete-modal');
+        const modalCancel = document.getElementById('modal-cancel');
+        const modalConfirm = document.getElementById('modal-confirm');
+
+        if (deleteBtn) deleteBtn.addEventListener('click', () => {
+            deleteModal.classList.add('show');
+        });
+        if (modalCancel) modalCancel.addEventListener('click', () => {
+            deleteModal.classList.remove('show');
+        });
+        if (modalConfirm) modalConfirm.addEventListener('click', async () => {
+            modalConfirm.innerText = '삭제 중...';
+            modalConfirm.disabled = true;
+            try {
+                const res = await fetch('/api/settings', {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                deleteModal.classList.remove('show');
+                alert(data.message || '삭제되었습니다.');
+                // 페이지 새로고침으로 연동 현황 반영
+                window.location.reload();
+            } catch(e) {
+                alert('삭제 중 오류가 발생했습니다.');
+            }
+            modalConfirm.innerText = '삭제하기';
+            modalConfirm.disabled = false;
+        });
+        // 모달 바깥 클릭 시 닫기
+        if (deleteModal) deleteModal.addEventListener('click', (e) => {
+            if (e.target === deleteModal) deleteModal.classList.remove('show');
+        });
         // 토글 버튼 스크립트
         document.getElementById('env-paper').addEventListener('click', function() {
             this.classList.add('active');

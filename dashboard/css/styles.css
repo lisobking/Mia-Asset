@@ -91,9 +91,9 @@ body {
 .market-temperature h3 { font-size: 1rem; color: var(--text-primary); margin-bottom: 5px; }
 .temp-desc { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem; }
 .temp-bar-container { width: 100%; margin-top: 20px; }
-.temp-bar { width: 100%; height: 12px; background: #e5e8eb; border-radius: 6px; overflow: hidden; }
-.temp-fill { height: 100%; background: linear-gradient(90deg, var(--negative-blue), var(--positive-red)); border-radius: 6px; transition: width 0.3s ease; }
-.temp-markers { display: flex; justify-content: space-between; margin-top: 8px; font-size: 0.8rem; color: var(--text-secondary); font-weight: 600;}
+.temp-bar { width: 100%; height: 14px; background: rgba(255,255,255,0.08); border-radius: 7px; overflow: hidden; border: 1px solid rgba(255,255,255,0.05); }
+.temp-fill { height: 100%; background: linear-gradient(90deg, var(--negative-blue), var(--positive-red)); border-radius: 7px; transition: width 0.5s ease; box-shadow: 0 0 8px rgba(0, 240, 255, 0.3); }
+.temp-markers { display: flex; justify-content: space-between; margin-top: 10px; font-size: 0.8rem; color: var(--text-secondary); font-weight: 600;}
 
 /* Buttons */
 .action-buttons, .order-buttons { display: flex; gap: 10px; }
