@@ -30,6 +30,26 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // 관리자 버튼 클릭 이벤트
+    const adminBtn = document.getElementById("admin-btn");
+    if (adminBtn) {
+        adminBtn.addEventListener("click", async () => {
+            const token = localStorage.getItem("agbot_token");
+            try {
+                const res = await fetch("/api/admin/users", { headers: { 'Authorization': `Bearer ${token}` } });
+                if (res.ok) {
+                    const users = await res.json();
+                    const userList = users.map(u => `- ${u.email}`).join("\n");
+                    alert(`👑 가입자 현황 (총 ${users.length}명)\n\n${userList}`);
+                } else {
+                    alert("권한이 없습니다.");
+                }
+            } catch (e) {
+                alert("서버 연결 오류");
+            }
+        });
+    }
+
     // 2초마다 백엔드 API에서 봇 상태를 가져와 대시보드 업데이트
     setInterval(async () => {
         try {
@@ -49,6 +69,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             const data = await response.json();
+            
+            // 관리자 버튼 표시
+            if (data.email === "lisob@naver.com") {
+                const adminBtn = document.getElementById("admin-btn");
+                if (adminBtn) adminBtn.style.display = "inline-block";
+            }
             
             // 1. 가격 업데이트 및 변동 효과
             const oldPrice = parseFloat(priceEl.innerText) || 0;

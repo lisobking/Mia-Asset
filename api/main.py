@@ -174,7 +174,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 
 @app.get("/api/status")
 def get_bot_status(current_user: User = Depends(get_current_user)):
-    return user_bot_states.get(current_user.id, {
+    state = user_bot_states.get(current_user.id, {
         "symbol": "SOXL",
         "state": "IDLE",
         "current_price": 0.0,
@@ -183,7 +183,16 @@ def get_bot_status(current_user: User = Depends(get_current_user)):
         "today_profit_pct": 0.0,
         "recent_trades": [],
         "api_connected": False
-    })
+    }).copy()
+    state["email"] = current_user.email
+    return state
+
+@app.get("/api/admin/users")
+def get_admin_users(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.email != "lisob@naver.com":
+        raise HTTPException(status_code=403, detail="Not authorized")
+    users = db.query(User).all()
+    return [{"id": u.id, "email": u.email} for u in users]
 
 # --- Auth 라우트 ---
 class UserCreate(BaseModel):
