@@ -43,9 +43,9 @@
         </div>
     </div>
     <script>
-        // 입력 실수 시 클릭하면 초기화
+        // 입력 실수 시 더블클릭하면 초기화 (일반 클릭 시 지워지는 불편함 개선)
         document.querySelectorAll('.form-control').forEach(input => {
-            input.addEventListener('click', function() {
+            input.addEventListener('dblclick', function() {
                 this.value = '';
             });
         });
