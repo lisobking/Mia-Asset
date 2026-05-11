@@ -18,15 +18,24 @@ class KisClient(BaseBroker):
         
         self.access_token = None
         self.token_expired_at = 0
+        self._last_token_request_at = 0  # 토큰 요청 시각 기록 (분당 1회 제한 대응)
         
         logger.info(f"Initialized KIS Client for account {self.account_number} (Paper: {self.is_paper})")
         
     def _get_access_token(self):
-        # 토큰 캐싱 (만료 전이면 재사용)
+        # 1. 유효한 토큰이 있으면 재사용
         if self.access_token and time.time() < self.token_expired_at:
             return self.access_token
-            
-        url = f"{self.base_url}/oauth2/tokenP"
+        
+        # 2. 마지막 요청 후 65초 이내면 대기 (제한: 분당 1회)
+        elapsed = time.time() - self._last_token_request_at
+        if elapsed < 65:
+            wait_left = int(65 - elapsed)
+            logger.warning(f"KIS 토큰 요청 쿨다운 중... {wait_left}초 남음. 기존 토큰 사용.")
+            return self.access_token  # None일 수 있으나 호출자가 예외 처리
+        
+        # 3. 신규 토큰 발급 시도
+        token_url = f"{self.base_url}/oauth2/tokenP"
         headers = {"content-type": "application/json"}
         body = {
             "grant_type": "client_credentials",
@@ -34,13 +43,15 @@ class KisClient(BaseBroker):
             "appsecret": self.secret_key
         }
         
+        self._last_token_request_at = time.time()  # 요청 시각 기록 (쿨다운 시작)
         try:
-            res = requests.post(url, headers=headers, json=body, timeout=5)
+            res = requests.post(token_url, headers=headers, json=body, timeout=5)
             if res.status_code == 200:
                 data = res.json()
                 self.access_token = data.get("access_token")
                 # KIS 토큰은 보통 24시간 유효 (안전하게 60초 미리 만료)
                 self.token_expired_at = time.time() + int(data.get("expires_in", 86400)) - 60
+                logger.info(f"KIS 액세스 토큰 발급 성공. 만료까지 {int(data.get('expires_in', 86400) - 60)}초")
                 return self.access_token
             else:
                 logger.error(f"KIS Token Error: {res.text}")
