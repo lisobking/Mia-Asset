@@ -63,7 +63,8 @@ async def trading_bot_loop():
                             "balance": 0.0,
                             "today_profit_pct": 0.0,
                             "recent_trades": [],
-                            "api_connected": False
+                            "api_connected": False,
+                            "is_active": False
                         }
                     
                     state_db = user_bot_states[user.id]
@@ -84,7 +85,8 @@ async def trading_bot_loop():
                         else:
                             broker = AlpacaClient(is_paper=is_paper, api_key=decrypted_api_key, secret_key=decrypted_secret_key)
                         
-                        bot = TradingStateMachine(broker=broker, symbol=state_db["symbol"])
+                        trade_amount = setting.trade_amount if setting else 50000.0
+                        bot = TradingStateMachine(broker=broker, symbol=state_db["symbol"], trade_amount=trade_amount)
                         user_bots[user.id] = {"broker": broker, "bot": bot}
                     
                     user_bot = user_bots[user.id]
@@ -113,13 +115,19 @@ async def trading_bot_loop():
                         current_rsi = state_db["rsi_15m"]
 
                     # 3. 메인 트레이딩 로직 실행
-                    if current_price > 0:
+                    is_active = setting.is_active if setting else False
+                    state_db["is_active"] = is_active
+                    
+                    if current_price > 0 and is_active:
                         bot.process_data(current_price, current_rsi)
                     
                     # 4. 상태 및 잔고 업데이트
                     state_db["state"] = bot.state.value
                     balance = broker.get_account_balance()
+                    pos = broker.get_position(bot.symbol)
+                    
                     state_db["balance"] = balance
+                    state_db["held_qty"] = pos.get("qty", 0) if pos else 0
                     state_db["api_connected"] = True
                     
                 except Exception as user_e:
@@ -184,9 +192,11 @@ def get_bot_status(current_user: User = Depends(get_current_user)):
         "current_price": 0.0,
         "rsi_15m": 0.0,
         "balance": 0.0,
+        "held_qty": 0,
         "today_profit_pct": 0.0,
         "recent_trades": [],
-        "api_connected": False
+        "api_connected": False,
+        "is_active": False
     }).copy()
     state["email"] = current_user.email
     return state
@@ -279,6 +289,70 @@ def update_trading_settings(settings: TradingSettingsUpdate, current_user: User 
         db_setting.target_symbol = settings.target_symbol
         db_setting.trade_amount = settings.trade_amount
         db.commit()
+        
+        # 봇의 상태에도 즉시 반영
+        if current_user.id in user_bots:
+            user_bots[current_user.id]["bot"].trade_amount = settings.trade_amount
+            
         return {"status": "success", "message": "Trading settings updated"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+class ManualTradeRequest(BaseModel):
+    action: str # "buy" or "sell"
+    qty: int
+
+@app.post("/api/trade")
+def manual_trade(req: ManualTradeRequest, current_user: User = Depends(get_current_user)):
+    user_bot = user_bots.get(current_user.id)
+    if not user_bot:
+        return {"status": "error", "message": "봇이 아직 API에 연결되지 않았습니다. 설정 페이지에서 증권사 정보를 연동해주세요."}
+    
+    bot = user_bot["bot"]
+    broker = user_bot["broker"]
+    current_price = broker.get_current_price(bot.symbol)
+    
+    if req.qty <= 0:
+        return {"status": "error", "message": "수량은 1주 이상이어야 합니다."}
+
+    if req.action == "buy":
+        res = broker.submit_order(bot.symbol, req.qty, "buy")
+        if res.get("status") == "filled":
+            bot.high_water_mark = current_price
+            bot.partial_sold = False
+            bot._transition_to(bot.state.HOLDING)
+        return {"status": "success", "message": f"{req.qty}주 수동 매수 요청 완료!"}
+        
+    elif req.action == "sell":
+        pos = broker.get_position(bot.symbol)
+        if pos.get("qty", 0) < req.qty:
+            return {"status": "error", "message": f"매도 수량({req.qty}주)이 보유 수량({pos.get('qty', 0)}주)보다 많습니다."}
+            
+        res = broker.submit_order(bot.symbol, req.qty, "sell")
+        
+        # 전량 매도시 IDLE, 일부 매도시 HOLDING 유지
+        new_pos = broker.get_position(bot.symbol)
+        if new_pos.get("qty", 0) <= 0:
+            bot._transition_to(bot.state.IDLE)
+            
+        return {"status": "success", "message": f"{req.qty}주 수동 매도 요청 완료!"}
+
+class BotToggleRequest(BaseModel):
+    is_active: bool
+
+@app.post("/api/bot/toggle")
+def toggle_bot(req: BotToggleRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    setting = db.query(TradingSetting).filter(TradingSetting.user_id == current_user.id).first()
+    if not setting:
+        setting = TradingSetting(user_id=current_user.id)
+        db.add(setting)
+    
+    setting.is_active = req.is_active
+    db.commit()
+    
+    # 상태 즉시 업데이트
+    if current_user.id in user_bot_states:
+        user_bot_states[current_user.id]["is_active"] = req.is_active
+        
+    status_text = "자동매매가 시작되었습니다!" if req.is_active else "자동매매가 일시정지되었습니다."
+    return {"status": "success", "message": status_text, "is_active": req.is_active}

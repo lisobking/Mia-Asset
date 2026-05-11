@@ -50,6 +50,71 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // 자동매매 시작 및 정지 버튼 연동
+    const btnStart = document.getElementById("btn-bot-start");
+    const btnPause = document.getElementById("btn-bot-pause");
+    
+    async function toggleBot(isActive) {
+        const token = localStorage.getItem("agbot_token");
+        if (!token) return;
+        try {
+            const res = await fetch("/api/bot/toggle", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ is_active: isActive })
+            });
+            const data = await res.json();
+            alert(data.message);
+        } catch (e) {
+            alert("통신 오류 발생");
+        }
+    }
+    
+    if (btnStart) btnStart.addEventListener("click", () => toggleBot(true));
+    if (btnPause) btnPause.addEventListener("click", () => toggleBot(false));
+
+    // 수동 주문 버튼 연동
+    const btnBuy = document.getElementById("btn-manual-buy");
+    const btnSell = document.getElementById("btn-manual-sell");
+
+    async function manualTrade(action) {
+        const qtyInputId = action === 'buy' ? 'manual-buy-qty' : 'manual-sell-qty';
+        const qtyInput = document.getElementById(qtyInputId);
+        const qty = parseInt(qtyInput ? qtyInput.value : 0);
+        if (!qty || qty <= 0) {
+            alert("주문할 수량을 1주 이상 정확히 입력해주세요.");
+            return;
+        }
+
+        if (!confirm(`정말로 즉시 ${qty}주를 ${action === 'buy' ? '매수' : '매도'}하시겠습니까?`)) return;
+        const token = localStorage.getItem("agbot_token");
+        if (!token) return;
+        
+        // 버튼 로딩 상태 표시
+        const btn = action === 'buy' ? btnBuy : btnSell;
+        const originalText = btn.innerText;
+        btn.innerText = "요청중...";
+        btn.disabled = true;
+        
+        try {
+            const res = await fetch("/api/trade", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ action: action, qty: qty })
+            });
+            const data = await res.json();
+            alert(data.message);
+        } catch (e) {
+            alert("통신 오류 발생");
+        }
+        
+        btn.innerText = originalText;
+        btn.disabled = false;
+    }
+
+    if (btnBuy) btnBuy.addEventListener("click", () => manualTrade("buy"));
+    if (btnSell) btnSell.addEventListener("click", () => manualTrade("sell"));
+
     // 2초마다 백엔드 API에서 봇 상태를 가져와 대시보드 업데이트
     setInterval(async () => {
         try {
@@ -97,6 +162,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
+            const manualBalance = document.getElementById("manual-balance");
+            const manualHeldQty = document.getElementById("manual-held-qty");
+            if (manualBalance) manualBalance.innerText = data.balance ? data.balance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : "0.00";
+            if (manualHeldQty) manualHeldQty.innerText = data.held_qty || 0;
+
             // 2. RSI 업데이트
             if (rsiVal && rsiFill) {
                 const rsi = data.rsi_15m || 0;
@@ -106,7 +176,13 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // 3. 상태(State) 뱃지 업데이트
             if (stateBadge && data.state) {
-                if (data.state === "IDLE") {
+                if (data.is_active === false) {
+                    stateBadge.className = "current-state";
+                    stateBadge.innerText = "일시 정지됨 ⏸️";
+                    stateBadge.style.color = "#ffcc00";
+                    stateBadge.style.background = "rgba(255, 204, 0, 0.1)";
+                    if (stateDesc) stateDesc.innerText = "자동매매가 중지되었습니다. 수동매매만 가능합니다.";
+                } else if (data.state === "IDLE") {
                     stateBadge.className = "current-state";
                     stateBadge.innerText = "대기중 ☕";
                     stateBadge.style.color = "#8b92a5";

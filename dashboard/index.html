@@ -71,8 +71,18 @@
                     </div>
                     
                     <div class="action-buttons">
-                        <button class="btn btn-primary">▶ 자동매매 시작</button>
-                        <button class="btn btn-danger">■ 일시 정지</button>
+                        <button id="btn-bot-start" class="btn btn-primary">▶ 자동매매 시작</button>
+                        <button id="btn-bot-pause" class="btn btn-danger">■ 일시 정지</button>
+                    </div>
+
+                    <div class="trading-rules-guide" style="margin-top: 20px; padding-top: 15px; border-top: 1px dashed rgba(255,255,255,0.1); font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5;">
+                        <h3 style="font-size: 0.9rem; color: var(--text-primary); margin-bottom: 8px;">🤖 봇 매매 원칙</h3>
+                        <ul style="padding-left: 0; list-style-type: none; margin: 0;">
+                            <li style="margin-bottom: 6px;">🟢 <strong style="color:#00ff88;">매수:</strong> RSI 30 이하에서 위로 반등할 때</li>
+                            <li style="margin-bottom: 6px;">🔴 <strong style="color:#ff3366;">익절:</strong> RSI 70 도달(전량) 또는 +4% 도달(절반)</li>
+                            <li style="margin-bottom: 6px;">🛡️ <strong style="color:var(--warning);">방어:</strong> -2% 도달 시 칼손절</li>
+                            <li>📉 <strong style="color:#8b92a5;">안전:</strong> 고점 대비 1.5% 하락 시 전량 매도 (트레일링 스탑)</li>
+                        </ul>
                     </div>
                 </div>
             </section>
@@ -106,9 +116,26 @@
                 <div class="card manual-order-card">
                     <h2>내가 직접 주문하기</h2>
                     <p>AI 봇의 판단을 기다리지 않고 지금 당장 사고 팔 수 있어요.</p>
-                    <div class="order-buttons">
-                        <button class="btn btn-buy">지금 사기 (Buy)</button>
-                        <button class="btn btn-sell">지금 팔기 (Sell)</button>
+                    
+                    <div style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 12px; margin-bottom: 15px; margin-top: 15px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                            <span style="color: var(--text-secondary); font-size: 0.9rem;">매수 가능 금액 (잔고)</span>
+                            <span style="color: var(--text-primary); font-weight: 700;">$<span id="manual-balance">0.00</span></span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span style="color: var(--text-secondary); font-size: 0.9rem;">현재 보유 수량</span>
+                            <span style="color: var(--text-primary); font-weight: 700;"><span id="manual-held-qty">0</span>주</span>
+                        </div>
+                    </div>
+
+                    <div class="order-action" style="display: flex; gap: 10px; margin-bottom: 15px;">
+                        <input type="number" id="manual-buy-qty" class="form-control" placeholder="매수 수량 (주)" min="1" style="flex: 2; background: rgba(0,0,0,0.3); color: var(--text-primary); border-color: rgba(255,255,255,0.1);">
+                        <button id="btn-manual-buy" class="btn btn-buy" style="flex: 1;">지정 사기</button>
+                    </div>
+
+                    <div class="order-action" style="display: flex; gap: 10px;">
+                        <input type="number" id="manual-sell-qty" class="form-control" placeholder="매도 수량 (주)" min="1" style="flex: 2; background: rgba(0,0,0,0.3); color: var(--text-primary); border-color: rgba(255,255,255,0.1);">
+                        <button id="btn-manual-sell" class="btn btn-sell" style="flex: 1;">지정 팔기</button>
                     </div>
                 </div>
             </section>

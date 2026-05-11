@@ -15,9 +15,10 @@ class TradingStateMachine:
     RSI 15분봉 전략에 따른 상태 머신(State Machine)
     IDLE -> BUY_PENDING -> HOLDING -> SELL_PENDING -> IDLE 상태 전이 관리
     """
-    def __init__(self, broker, symbol="SOXL"):
+    def __init__(self, broker, symbol="SOXL", trade_amount=50000.0):
         self.broker = broker
         self.symbol = symbol
+        self.trade_amount = trade_amount
         self.state = BotState.IDLE
         
         # 이전 RSI 값을 추적하여 30을 '상향 돌파'하는지 확인
@@ -88,10 +89,10 @@ class TradingStateMachine:
         self.prev_rsi = current_rsi
 
     def execute_buy_order(self, current_price):
-        # 자금 관리: 잔고의 50% 투입 가정
+        # 자금 관리: 잔고의 50% 투입 가정 -> 설정된 금액 사용
         # 실제로는 position_sizer 모듈과 연동해야 함
-        target_amount = 50000.0 # 하드코딩 (테스트용)
-        qty = int(target_amount / current_price)
+        target_amount = self.trade_amount
+        qty = int(target_amount / current_price) if current_price > 0 else 0
         if qty > 0:
             res = self.broker.submit_order(self.symbol, qty, "buy")
             if res["status"] == "filled":
