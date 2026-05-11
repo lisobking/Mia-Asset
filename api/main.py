@@ -3,7 +3,7 @@ import os
 import logging
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
@@ -136,7 +136,7 @@ async def startup_event():
 @app.get("/")
 @app.head("/")
 def read_root():
-    return FileResponse("dashboard/index.html")
+    return RedirectResponse(url="/dashboard/index.html")
 
 # 미들웨어 함수를 라우트 선언 전에 사용하기 위해 앞으로 가져오기
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/login")
