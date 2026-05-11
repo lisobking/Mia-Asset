@@ -204,7 +204,7 @@ class KisClient(BaseBroker):
             res = requests.get(url, headers=headers, params=params, timeout=5)
             if res.status_code == 200:
                 data = res.json()
-                logger.info(f"KIS 원화잡고 rt_cd={data.get('rt_cd')}, msg={data.get('msg1', '')}")
+                logger.info(f"KIS 원화잔고 rt_cd={data.get('rt_cd')}, msg={data.get('msg1', '')}")
                 if data.get("rt_cd") == "0":
                     output = data.get("output", {})
                     if isinstance(output, list) and output:
@@ -213,12 +213,12 @@ class KisClient(BaseBroker):
                         val = str(output.get(field, "")).strip()
                         if val and val != "0":
                             krw_balance = float(val)
-                            logger.info(f"KIS 원화 잡고({field}): ₩{krw_balance:,.0f}")
+                            logger.info(f"KIS 원화 잔고({field}): ₩{krw_balance:,.0f}")
                             break
         except Exception as e:
-            logger.warning(f"KIS 원화 잡고 조회 실패: {e}")
+            logger.warning(f"KIS 원화 잔고 조회 실패: {e}")
 
-        # ---- 2. 해외주식 달러 잡고 조회 (inquire-present-balance) ----
+        # ---- 2. 해외주식 달러 잔고 조회 (inquire-present-balance) ----
         try:
             url = f"{self.base_url}/uapi/overseas-stock/v1/trading/inquire-present-balance"
             tr_id = "VTTS3012R" if self.is_paper else "CTTS3012R"
@@ -231,7 +231,7 @@ class KisClient(BaseBroker):
             res = requests.get(url, headers=headers, params=params, timeout=5)
             if res.status_code == 200:
                 data = res.json()
-                logger.info(f"KIS 해외잡고 rt_cd={data.get('rt_cd')}")
+                logger.info(f"KIS 해외잔고 rt_cd={data.get('rt_cd')}")
                 if data.get("rt_cd") == "0":
                     summary = data.get("output2", {})
                     if isinstance(summary, list) and summary:
@@ -240,15 +240,15 @@ class KisClient(BaseBroker):
                         val = str(summary.get(field, "")).strip()
                         if val and val != "0":
                             usd_balance = float(val)
-                            logger.info(f"KIS 해외 잡고({field}): ${usd_balance}")
+                            logger.info(f"KIS 해외 잔고({field}): ${usd_balance}")
                             break
         except Exception as e:
-            logger.warning(f"KIS 해외 잡고 조회 실패: {e}")
+            logger.warning(f"KIS 해외 잔고 조회 실패: {e}")
 
         return {"krw": krw_balance, "usd": usd_balance}
 
     def get_account_balance(self) -> float:
-        """하위호환 유지: 해외달러 잡고를 float으로 반환 (TradingStateMachine 호환 유지)"""
+        """하위호환 유지: 해외달러 잔고를 float으로 반환 (TradingStateMachine 호환 유지)"""
         detail = self.get_balance_detail()
         # 해외 달러 잔고가 있으면 우선, 없으면 원화를 환산
         if detail["usd"] > 0:
