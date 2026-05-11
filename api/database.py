@@ -16,6 +16,11 @@ SQLALCHEMY_DATABASE_URL = os.getenv(
     "sqlite:///./sql_app.db" # 기본값 SQLite
 )
 
+# Render에서 제공하는 postgres:// 를 SQLAlchemy 1.4+ 지원 규격인 postgresql:// 로 자동 변환
+if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
+    SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+
 # SQLite의 경우 check_same_thread=False 필요
 connect_args = {"check_same_thread": False} if "sqlite" in SQLALCHEMY_DATABASE_URL else {}
 
