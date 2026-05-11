@@ -184,6 +184,11 @@
                     }
                 }
 
+                // API 키·시크릿·계좌번호 폼 자동 채우기 (복호화된 실제값)
+                if (data.api_key) document.getElementById('api-key').value = data.api_key;
+                if (data.secret_key) document.getElementById('secret-key').value = data.secret_key;
+                if (data.account_number) document.getElementById('account-number').value = data.account_number;
+
                 // 종목·매수금액 자동 채우기
                 if (data.target_symbol) document.getElementById('target-ticker').value = data.target_symbol;
                 if (data.trade_amount) document.getElementById('trade-amount').value = Math.min(data.trade_amount, 500);

@@ -363,12 +363,20 @@ def get_api_settings(current_user: User = Depends(get_current_user), db: Session
             "target_symbol": setting.target_symbol if setting else "SOXL",
             "trade_amount": setting.trade_amount if setting else 500.0
         }
-    # 암호화된 raw 값의 앞 6자 마스킹 표시 (복호화하지 않고 존재 여부만 노출)
+    # HTTPS + JWT 인증으로 본인에게만 노출 → 복호화된 값 반환하여 폼 재편집 가능하게
+    decrypted_api_key = decrypt_data(cred.api_key) or ""
+    decrypted_secret_key = decrypt_data(cred.secret_key) or ""
+    decrypted_account = decrypt_data(cred.account_number) if cred.account_number else ""
     return {
         "has_credentials": True,
         "broker_name": cred.broker_name,
         "env_type": cred.env_type,
-        "masked_api_key": "••••••••" + (decrypt_data(cred.api_key) or "")[-4:],
+        # 연동 현황 박스용 마스킹 표시
+        "masked_api_key": (decrypted_api_key[:4] + "••••" + decrypted_api_key[-4:]) if len(decrypted_api_key) > 8 else "••••",
+        # 폼 재편집용 복호화 실제값
+        "api_key": decrypted_api_key,
+        "secret_key": decrypted_secret_key,
+        "account_number": decrypted_account,
         "target_symbol": setting.target_symbol if setting else "SOXL",
         "trade_amount": setting.trade_amount if setting else 500.0
     }
