@@ -136,7 +136,23 @@ async def startup_event():
 @app.get("/")
 @app.head("/")
 def read_root():
-    return RedirectResponse(url="/dashboard/index.html")
+    return FileResponse("dashboard/index.html")
+
+@app.get("/index.html")
+def get_index():
+    return FileResponse("dashboard/index.html")
+
+@app.get("/login.html")
+def get_login():
+    return FileResponse("dashboard/login.html")
+
+@app.get("/signup.html")
+def get_signup():
+    return FileResponse("dashboard/signup.html")
+
+@app.get("/settings.html")
+def get_settings():
+    return FileResponse("dashboard/settings.html")
 
 # 미들웨어 함수를 라우트 선언 전에 사용하기 위해 앞으로 가져오기
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/login")
