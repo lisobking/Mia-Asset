@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: ag-bot-web
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python run.py
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        value: Z3V6Y21uZGtvamVocWxzY21ueGthaG9wcWtqZGZncG0=
