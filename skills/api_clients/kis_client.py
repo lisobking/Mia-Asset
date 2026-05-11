@@ -74,9 +74,16 @@ class KisClient(BaseBroker):
         """해외주식(미국) 현재체결가 조회 (장 마감 시 빈 문자열 안전 처리)"""
         url = f"{self.base_url}/uapi/overseas-price/v1/quotations/price"
         headers = self._get_base_headers("HHDFS00000300")
+        # EXCD 코드: NAS=나스닥, NYS=뉴욕거래소, AMS=NYSE Arca(시장), BAQ=나스닥BAQ
+        # SOXL은 NYSE Arca 상장 ETF → AMS 사용
+        excd_map = {
+            "SOXL": "AMS", "SOXS": "AMS", "TQQQ": "NAS", "QQQ": "NAS",
+            "SPY": "AMS", "SPXL": "AMS", "UPRO": "AMS",
+        }
+        excd = excd_map.get(symbol.upper(), "NAS")
         params = {
             "AUTH": "",
-            "EXCD": "NAS",  # 나스닥 기준 (NYSE: AMS, AMEX: AMX)
+            "EXCD": excd,
             "SYMB": symbol
         }
         try:
@@ -85,21 +92,24 @@ class KisClient(BaseBroker):
                 data = res.json()
                 if data.get("rt_cd") == "0":
                     output = data.get("output", {})
-                    # 장 마감/데이터 없을 때 KIS는 숫자 필드를 빈 문자열('')로 반환함
-                    last_str = output.get("last", "").strip()
-                    if not last_str:
-                        # last가 없으면 전일 종가(base)로 대체 시도
-                        last_str = output.get("base", "").strip()
-                    if last_str:
-                        return float(last_str)
-                    logger.warning(f"KIS: {symbol} 가격 데이터 없음 (장 마감 또는 미지원 종목)")
+                    # 장 마감/데이터 없을 때 KIS는 숫자 필드를 빈 문자열('')로 반환
+                    for field in ["last", "base", "open", "high", "low"]:
+                        val = output.get(field, "").strip()
+                        if val:
+                            try:
+                                return float(val)
+                            except ValueError:
+                                continue
+                    logger.warning(f"KIS: {symbol}({excd}) 가격 데이터 없음. output={output}")
                 else:
                     logger.warning(f"KIS Price API 오류: rt_cd={data.get('rt_cd')}, msg={data.get('msg1')}")
+            else:
+                logger.warning(f"KIS Price HTTP {res.status_code}: {res.text[:200]}")
         except Exception as e:
             logger.error(f"KIS Price Fetch Error for {symbol}: {e}")
-        
+
         return 0.0
-        
+
     def submit_order(self, symbol: str, qty: int, side: str, order_type: str = "market") -> dict:
         """해외주식 주문"""
         url = f"{self.base_url}/uapi/overseas-stock/v1/trading/order"
